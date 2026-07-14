@@ -145,8 +145,8 @@ export function TextBannerEditor({
         <span>
           <strong>Uhrzeit oben (live)</strong>
           <small>
-            Zeigt die aktuelle Zeit mittig oben — aktualisiert sich alle paar
-            Sekunden.
+            Zeigt die aktuelle Zeit mittig oben mit Sekunden — aktualisiert
+            sich jede Sekunde.
           </small>
         </span>
       </label>
@@ -260,7 +260,7 @@ export function TextBannerEditor({
       ) : hasLiveRefresh ? (
         <p className="hint">
           {textBanner.showClock
-            ? "Uhrzeit wird live aktualisiert"
+            ? "Uhrzeit wird jede Sekunde aktualisiert"
             : null}
           {textBanner.showClock && textBanner.showCornerSensors ? " · " : null}
           {textBanner.showCornerSensors

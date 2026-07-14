@@ -13,7 +13,12 @@ import { generateTextBannerImage } from "./text-banner";
 import { runAsterctlDirect } from "./asterctl-runner";
 import type { TextBannerSettings } from "./types";
 
-const REFRESH_MS = 3_000;
+const CORNER_REFRESH_MS = 3_000;
+const CLOCK_REFRESH_MS = 1_000;
+
+function resolveRefreshMs(settings: TextBannerSettings): number {
+  return settings.showClock ? CLOCK_REFRESH_MS : CORNER_REFRESH_MS;
+}
 
 let refreshTimer: NodeJS.Timeout | null = null;
 let activeSettings: TextBannerSettings | null = null;
@@ -73,7 +78,7 @@ export async function startTextBannerLive(
       const message = error instanceof Error ? error.message : "Unknown error";
       void appendLog("error", "text-banner", "Refresh failed", message);
     });
-  }, REFRESH_MS);
+  }, resolveRefreshMs(settings));
 }
 
 export async function stopTextBannerLive(): Promise<void> {
