@@ -13,13 +13,12 @@ import { generateTextBannerImage } from "./text-banner";
 import { runAsterctlDirect } from "./asterctl-runner";
 import type { TextBannerSettings } from "./types";
 
-const CORNER_REFRESH_MS = 3_000;
-const CLOCK_REFRESH_MS = 1_000;
+const LIVE_REFRESH_MS = 3_000;
 const STOP_WAIT_MS = 5_000;
 const STOP_POLL_MS = 25;
 
-function resolveRefreshMs(settings: TextBannerSettings): number {
-  return settings.showClock ? CLOCK_REFRESH_MS : CORNER_REFRESH_MS;
+function resolveRefreshMs(): number {
+  return LIVE_REFRESH_MS;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -101,7 +100,7 @@ export async function startTextBannerLive(
       const message = error instanceof Error ? error.message : "Unknown error";
       void appendLog("error", "text-banner", "Refresh failed", message);
     });
-  }, resolveRefreshMs(settings));
+  }, resolveRefreshMs());
 }
 
 export async function stopTextBannerLive(): Promise<void> {
