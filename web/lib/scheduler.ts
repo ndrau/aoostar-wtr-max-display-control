@@ -1,4 +1,5 @@
 import { applyConfig } from "./display";
+import { appendLog } from "./logger";
 import { readConfig } from "./config";
 import type { DisplayConfig } from "./types";
 
@@ -45,12 +46,24 @@ export async function runScheduledCheck(): Promise<void> {
   }
 
   if (shouldDisplay) {
+    await appendLog(
+      "info",
+      "scheduler",
+      "Timer window active, turning display on",
+      `on ${config.schedule.displayOnTime}, off ${config.schedule.displayOffTime}`,
+    );
     await applyConfig({
       ...config,
       displayMode:
         config.displayMode === "off" ? "truenas" : config.displayMode,
     });
   } else {
+    await appendLog(
+      "info",
+      "scheduler",
+      "Timer window inactive, turning display off",
+      `on ${config.schedule.displayOnTime}, off ${config.schedule.displayOffTime}`,
+    );
     await applyConfig({ ...config, displayMode: "off" });
   }
 
@@ -58,9 +71,12 @@ export async function runScheduledCheck(): Promise<void> {
 }
 
 export function startScheduler(): void {
+  void appendLog("info", "scheduler", "Scheduler started");
+
   const tick = () => {
     runScheduledCheck().catch((error) => {
-      console.error("[scheduler]", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      void appendLog("error", "scheduler", "Scheduler tick failed", message);
     });
   };
 

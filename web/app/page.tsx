@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DisplayConfig, DisplayMode } from "@/lib/types";
+
+interface LogEntry {
+  ts: string;
+  level: "info" | "warn" | "error" | "debug";
+  source: string;
+  message: string;
+  detail?: string;
+}
 
 const MODE_OPTIONS: Array<{
   value: DisplayMode;
@@ -30,12 +38,103 @@ const MODE_OPTIONS: Array<{
   },
 ];
 
+function formatTime(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+function LogsPanel({
+  refreshToken,
+  onClear,
+}: {
+  refreshToken: number;
+  onClear: () => void;
+}) {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const panelRef = useRef<HTMLPreElement>(null);
+
+  const fetchLogs = useCallback(async () => {
+    try {
+      const response = await fetch("/api/logs?limit=200");
+      const data = await response.json();
+      if (data.ok) {
+        setLogs(data.logs);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLogs();
+    const interval = window.setInterval(fetchLogs, 3000);
+    return () => window.clearInterval(interval);
+  }, [fetchLogs, refreshToken]);
+
+  useEffect(() => {
+    if (panelRef.current) {
+      panelRef.current.scrollTop = panelRef.current.scrollHeight;
+    }
+  }, [logs]);
+
+  async function clearLogs() {
+    await fetch("/api/logs", { method: "DELETE" });
+    setLogs([]);
+    onClear();
+  }
+
+  return (
+    <section className="card logs-card">
+      <div className="logs-header">
+        <h2>Activity log</h2>
+        <div className="actions">
+          <button className="btn btn-secondary" onClick={() => fetchLogs()}>
+            Refresh
+          </button>
+          <button className="btn btn-danger" onClick={clearLogs}>
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <pre className="logs-panel" ref={panelRef}>
+        {loading && logs.length === 0 ? (
+          <div className="log-line">Loading logs…</div>
+        ) : null}
+        {!loading && logs.length === 0 ? (
+          <div className="log-line">No log entries yet.</div>
+        ) : null}
+        {logs.map((entry, index) => (
+          <div className="log-line" key={`${entry.ts}-${index}`}>
+            <span className="log-time">{formatTime(entry.ts)}</span>{" "}
+            <span className={`log-level-${entry.level}`}>
+              [{entry.level.toUpperCase()}]
+            </span>{" "}
+            <span className="log-source">[{entry.source}]</span> {entry.message}
+            {entry.detail ? (
+              <>
+                {" "}
+                <span className="log-detail">— {entry.detail}</span>
+              </>
+            ) : null}
+          </div>
+        ))}
+      </pre>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [config, setConfig] = useState<DisplayConfig | null>(null);
   const [status, setStatus] = useState<string>("Loading settings…");
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [logRefreshToken, setLogRefreshToken] = useState(0);
+
+  function bumpLogs() {
+    setLogRefreshToken((value) => value + 1);
+  }
 
   useEffect(() => {
     fetch("/api/config")
@@ -73,11 +172,13 @@ export default function Dashboard() {
 
       setConfig(data.config);
       setStatus("Display updated successfully.");
+      bumpLogs();
     } catch (saveError) {
       const message =
         saveError instanceof Error ? saveError.message : "Unknown error";
       setStatus(message);
       setError(true);
+      bumpLogs();
     } finally {
       setSaving(false);
     }
@@ -100,11 +201,13 @@ export default function Dashboard() {
       }
 
       setStatus(`Quick action "${action}" applied.`);
+      bumpLogs();
     } catch (actionError) {
       const message =
         actionError instanceof Error ? actionError.message : "Unknown error";
       setStatus(message);
       setError(true);
+      bumpLogs();
     }
   }
 
@@ -128,11 +231,13 @@ export default function Dashboard() {
 
       setConfig(data.config);
       setStatus("Custom image uploaded and applied.");
+      bumpLogs();
     } catch (uploadError) {
       const message =
         uploadError instanceof Error ? uploadError.message : "Unknown error";
       setStatus(message);
       setError(true);
+      bumpLogs();
     } finally {
       setUploading(false);
     }
@@ -300,6 +405,11 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      <LogsPanel
+        refreshToken={logRefreshToken}
+        onClear={() => setStatus("Logs cleared.")}
+      />
     </main>
   );
 }

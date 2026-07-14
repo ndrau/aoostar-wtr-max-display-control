@@ -48,8 +48,9 @@ Example from AOOSTAR WTR Max:
 | Quick actions | Instantly show logo, restore original, or turn display off |
 | Custom upload | Upload PNG/JPG (960×376 recommended) |
 | Timer | Daily on/off schedule |
+| Activity log | Live log of boot, asterctl commands, scheduler, uploads, and errors |
 
-Settings are stored in the mounted volume at `/data/config.json`.
+Settings are stored in the mounted volume at `/data/config.json`. Logs are stored at `/data/logs/display.log`.
 
 ## Local build
 

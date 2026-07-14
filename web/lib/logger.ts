@@ -1,0 +1,77 @@
+import { appendFile, mkdir, readFile, writeFile } from "fs/promises";
+import path from "path";
+import { DATA_DIR } from "./paths";
+
+export type LogLevel = "info" | "warn" | "error" | "debug";
+
+export interface LogEntry {
+  ts: string;
+  level: LogLevel;
+  source: string;
+  message: string;
+  detail?: string;
+}
+
+export const LOG_PATH = path.join(DATA_DIR, "logs", "display.log");
+const MAX_LOG_LINES = 500;
+
+async function ensureLogDir() {
+  await mkdir(path.dirname(LOG_PATH), { recursive: true });
+}
+
+async function trimLogFile() {
+  try {
+    const raw = await readFile(LOG_PATH, "utf8");
+    const lines = raw.split("\n").filter(Boolean);
+
+    if (lines.length <= MAX_LOG_LINES) {
+      return;
+    }
+
+    const trimmed = lines.slice(-MAX_LOG_LINES).join("\n") + "\n";
+    await writeFile(LOG_PATH, trimmed, "utf8");
+  } catch {
+    // Log file may not exist yet.
+  }
+}
+
+export async function appendLog(
+  level: LogLevel,
+  source: string,
+  message: string,
+  detail?: string,
+): Promise<LogEntry> {
+  await ensureLogDir();
+
+  const entry: LogEntry = {
+    ts: new Date().toISOString(),
+    level,
+    source,
+    message,
+    ...(detail ? { detail } : {}),
+  };
+
+  await appendFile(LOG_PATH, `${JSON.stringify(entry)}\n`, "utf8");
+  await trimLogFile();
+
+  return entry;
+}
+
+export async function readLogs(limit = 200): Promise<LogEntry[]> {
+  try {
+    const raw = await readFile(LOG_PATH, "utf8");
+    const entries = raw
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as LogEntry);
+
+    return entries.slice(-limit);
+  } catch {
+    return [];
+  }
+}
+
+export async function clearLogs(): Promise<void> {
+  await ensureLogDir();
+  await writeFile(LOG_PATH, "", "utf8");
+}

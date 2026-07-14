@@ -1,6 +1,7 @@
 import { execFile } from "child_process";
 import { access } from "fs/promises";
 import { promisify } from "util";
+import { appendLog } from "./logger";
 import { ASTERCTL_PATH, DEVICE, TRUENAS_LOGO_PATH } from "./paths";
 import type { DisplayConfig, DisplayMode } from "./types";
 
@@ -16,16 +17,24 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 export async function runAsterctl(args: string[]): Promise<string> {
-  const { stdout, stderr } = await execFileAsync(ASTERCTL_PATH, args, {
-    timeout: 30_000,
-    maxBuffer: 1024 * 1024,
-  });
+  const command = `${ASTERCTL_PATH} ${args.join(" ")}`;
+  await appendLog("info", "asterctl", "Running command", command);
 
-  if (stderr?.trim()) {
-    return stderr.trim();
+  try {
+    const { stdout, stderr } = await execFileAsync(ASTERCTL_PATH, args, {
+      timeout: 30_000,
+      maxBuffer: 1024 * 1024,
+    });
+
+    const output = stderr?.trim() || stdout?.trim() || "Command completed";
+
+    await appendLog("info", "asterctl", "Command finished", output);
+    return output;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    await appendLog("error", "asterctl", "Command failed", message);
+    throw error;
   }
-
-  return stdout?.trim() ?? "";
 }
 
 export function resolveModeArgs(
@@ -67,6 +76,7 @@ export async function applyDisplayMode(
     throw new Error("TrueNAS logo asset missing in container");
   }
 
+  await appendLog("info", "display", `Applying display mode: ${mode}`);
   return runAsterctl(args);
 }
 
@@ -77,6 +87,8 @@ export async function applyConfig(config: DisplayConfig): Promise<string> {
 export async function quickCommand(
   command: "on" | "off" | "original",
 ): Promise<string> {
+  await appendLog("info", "display", `Quick action: ${command}`);
+
   if (command === "off") {
     return runAsterctl(["--device", DEVICE, "--off"]);
   }

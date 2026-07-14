@@ -27,6 +27,7 @@ RUN mkdir -p /tmp/asterctl /app/cfg /app/assets /app/scripts /data/uploads \
 
 COPY assets/truenas-scale.png /app/assets/truenas-scale.png
 COPY scripts/apply-boot.mjs /app/scripts/apply-boot.mjs
+COPY scripts/log-append.mjs /app/scripts/log-append.mjs
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

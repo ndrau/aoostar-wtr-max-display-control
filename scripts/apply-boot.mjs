@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
+import { appendBootLog } from "./log-append.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -38,6 +39,7 @@ function resolveArgs(config) {
 }
 
 async function main() {
+  await appendBootLog("info", "boot", "Container starting, applying display config");
   await mkdir(`${DATA_DIR}/uploads`, { recursive: true });
 
   let config = DEFAULT_CONFIG;
@@ -47,14 +49,23 @@ async function main() {
     config = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
   } catch {
     await writeFile(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2), "utf8");
+    await appendBootLog("info", "boot", "Created default config", CONFIG_PATH);
   }
 
   const args = ["--device", DEVICE, ...resolveArgs(config)];
+  const command = `${ASTERCTL} ${args.join(" ")}`;
+
+  await appendBootLog("info", "boot", "Running startup command", command);
   await execFileAsync(ASTERCTL, args, { timeout: 30_000 });
-  console.log(`[boot] applied mode: ${config.displayMode}`);
+  await appendBootLog(
+    "info",
+    "boot",
+    `Startup complete, mode: ${config.displayMode}`,
+  );
 }
 
-main().catch((error) => {
-  console.error("[boot] failed to apply display config:", error);
+main().catch(async (error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  await appendBootLog("error", "boot", "Startup failed", message);
   process.exit(1);
 });

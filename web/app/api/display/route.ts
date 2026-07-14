@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { quickCommand } from "@/lib/display";
+import { appendLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, output });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    await appendLog("error", "display", "Quick action failed", message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { readConfig, writeConfig } from "@/lib/config";
 import { applyConfig } from "@/lib/display";
+import { appendLog } from "@/lib/logger";
 import { UPLOAD_DIR } from "@/lib/paths";
 
 export const runtime = "nodejs";
@@ -31,6 +32,13 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(targetPath, buffer);
 
+    await appendLog(
+      "info",
+      "upload",
+      "Custom image uploaded",
+      `${file.name} -> ${targetPath}`,
+    );
+
     const config = await readConfig();
     const nextConfig = {
       ...config,
@@ -48,6 +56,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    await appendLog("error", "upload", "Upload failed", message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
