@@ -3,13 +3,14 @@ services:
     image: ghcr.io/ndrau/aoostar-wtr-max-display:latest
     container_name: aoostar-display
     restart: unless-stopped
+    ports:
+      - "3910:3000"
     devices:
-      # Stable USB path for AOOSTAR WTR Max (Synwit USB Virtual COM)
       - /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0
     environment:
       DEVICE: /dev/ttyACM0
-      KEEP_ALIVE: "true"
-    # Display off on start (default). Other examples:
-    # command: ["--on"]
-    # command: ["--image", "/data/logo.png"]
-    command: ["--off"]
+      DATA_DIR: /data
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    volumes:
+      - /mnt/AndysFastStorage/docker/aoostar-display:/data

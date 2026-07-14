@@ -1,31 +1,11 @@
 #!/bin/sh
 set -e
 
-device="${DEVICE:-/dev/ttyACM0}"
+mkdir -p /data/uploads
 
-if [ "$1" = "--" ]; then
-  shift
-fi
+echo "[entrypoint] applying display configuration"
+node /app/scripts/apply-boot.mjs
 
-if [ $# -eq 0 ]; then
-  set -- --off
-fi
-
-case "$1" in
-  --device)
-    /usr/local/bin/asterctl "$@"
-    ;;
-  --help|-h|--version|-V)
-    /usr/local/bin/asterctl "$@"
-    ;;
-  --*)
-    /usr/local/bin/asterctl --device "$device" "$@"
-    ;;
-  *)
-    /usr/local/bin/asterctl --device "$device" "$@"
-    ;;
-esac
-
-if [ "${KEEP_ALIVE:-true}" = "true" ]; then
-  exec sleep infinity
-fi
+echo "[entrypoint] starting web UI on port ${PORT:-3000}"
+cd /app
+exec node server.js
