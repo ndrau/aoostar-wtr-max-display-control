@@ -1,494 +1,44 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { AuthScreen } from "@/components/AuthScreen";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { CustomUpload } from "@/components/CustomUpload";
+import { DisplayPreview } from "@/components/DisplayPreview";
+import { LogsPanel } from "@/components/LogsPanel";
+import { ModePicker } from "@/components/ModePicker";
+import { ScheduleEditor } from "@/components/ScheduleEditor";
+import { SensorsPanel } from "@/components/SensorsPanel";
+import { TextBannerEditor } from "@/components/TextBannerEditor";
 import {
   apiFetch,
   getStoredApiToken,
   storeApiToken,
 } from "@/lib/client-auth";
-import type { DisplayConfig, DisplayMode, TextBannerSettings } from "@/lib/types";
-import {
-  BANNER_CORNER_LABELS,
-  formatCornerLabel,
-  SENSOR_FIELD_GROUPS,
-  type BannerCorner,
-  type SensorFieldId,
-} from "@/lib/sensor-fields";
-
-interface LogEntry {
-  ts: string;
-  level: "info" | "warn" | "error" | "debug";
-  source: string;
-  message: string;
-  detail?: string;
-}
-
-const MODE_OPTIONS: Array<{
-  value: DisplayMode;
-  title: string;
-  description: string;
-  hint?: string;
-}> = [
-  {
-    value: "truenas",
-    title: "TrueNAS SCALE Logo",
-    description: "Static splash screen — shown on every container start by default.",
-  },
-  {
-    value: "sensors",
-    title: "System dashboard (live)",
-    description:
-      "AOOSTAR-style panels with CPU, RAM, GPU, network, and disk values.",
-    hint: "Requires host /proc and /sys mounts (see README). Updates every few seconds.",
-  },
-  {
-    value: "text",
-    title: "Text banner",
-    description:
-      "Custom text with colors plus optional live system data in each corner (960×376).",
-  },
-  {
-    value: "custom",
-    title: "Custom image",
-    description: "Static PNG/JPG you upload (960×376 recommended).",
-  },
-  {
-    value: "off",
-    title: "Display off",
-    description: "Turn the embedded LCD off completely.",
-  },
-];
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleString();
-}
-
-function normalizeHexColor(value: string, fallback: string): string {
-  const trimmed = value.trim();
-  if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
-    return trimmed.toLowerCase();
-  }
-  return fallback;
-}
-
-function TextBannerEditor({
-  textBanner,
-  active,
-  onChange,
-}: {
-  textBanner: TextBannerSettings;
-  active: boolean;
-  onChange: (next: TextBannerSettings) => void;
-}) {
-  const [sensorValues, setSensorValues] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSensors() {
-      try {
-        const response = await apiFetch("/api/sensors");
-        const data = await response.json();
-        if (!cancelled && data.ok) {
-          setSensorValues(data.values ?? {});
-        }
-      } catch {
-        // Preview works without live sensor data.
-      }
-    }
-
-    loadSensors();
-    const interval = window.setInterval(loadSensors, 4000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
-
-  function updateColor(
-    key: "textColor" | "backgroundColor" | "cornerColor",
-    value: string,
-    fallback: string,
-  ) {
-    onChange({
-      ...textBanner,
-      [key]: normalizeHexColor(value, fallback),
-    });
-  }
-
-  function updateCorner(corner: BannerCorner, value: SensorFieldId) {
-    onChange({
-      ...textBanner,
-      corners: {
-        ...textBanner.corners,
-        [corner]: value,
-      },
-    });
-  }
-
-  const cornerPositions: Record<BannerCorner, string> = {
-    topLeft: "corner-top-left",
-    topRight: "corner-top-right",
-    bottomLeft: "corner-bottom-left",
-    bottomRight: "corner-bottom-right",
-  };
-
-  return (
-    <div className={`card ${active ? "card-active" : ""}`}>
-      <h2>Text banner</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Create a display image from text. Optionally place live system data in
-        any corner. Select the &quot;Text banner&quot; mode above, then apply
-        settings.
-      </p>
-
-      <div className="field">
-        <label htmlFor="banner-text">Center text</label>
-        <textarea
-          id="banner-text"
-          rows={3}
-          maxLength={80}
-          value={textBanner.text}
-          onChange={(event) =>
-            onChange({ ...textBanner, text: event.target.value })
-          }
-          placeholder="e.g. TrueNAS SCALE"
-        />
-      </div>
-
-      <div className="row" style={{ marginTop: 14 }}>
-        <div className="field">
-          <label htmlFor="banner-text-color">Text color</label>
-          <div className="color-input">
-            <input
-              id="banner-text-color"
-              type="color"
-              value={textBanner.textColor}
-              onChange={(event) =>
-                updateColor("textColor", event.target.value, textBanner.textColor)
-              }
-            />
-            <input
-              type="text"
-              value={textBanner.textColor}
-              onChange={(event) =>
-                updateColor("textColor", event.target.value, textBanner.textColor)
-              }
-              spellCheck={false}
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="banner-bg-color">Background color</label>
-          <div className="color-input">
-            <input
-              id="banner-bg-color"
-              type="color"
-              value={textBanner.backgroundColor}
-              onChange={(event) =>
-                updateColor(
-                  "backgroundColor",
-                  event.target.value,
-                  textBanner.backgroundColor,
-                )
-              }
-            />
-            <input
-              type="text"
-              value={textBanner.backgroundColor}
-              onChange={(event) =>
-                updateColor(
-                  "backgroundColor",
-                  event.target.value,
-                  textBanner.backgroundColor,
-                )
-              }
-              spellCheck={false}
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="banner-corner-color">Corner data color</label>
-          <div className="color-input">
-            <input
-              id="banner-corner-color"
-              type="color"
-              value={textBanner.cornerColor}
-              onChange={(event) =>
-                updateColor(
-                  "cornerColor",
-                  event.target.value,
-                  textBanner.cornerColor,
-                )
-              }
-            />
-            <input
-              type="text"
-              value={textBanner.cornerColor}
-              onChange={(event) =>
-                updateColor(
-                  "cornerColor",
-                  event.target.value,
-                  textBanner.cornerColor,
-                )
-              }
-              spellCheck={false}
-            />
-          </div>
-        </div>
-      </div>
-
-      <h3 className="section-title">Corner system data</h3>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Choose which metric appears in each corner. Live values need host
-        /proc and /sys mounts.
-      </p>
-      <div className="corner-grid">
-        {(Object.keys(BANNER_CORNER_LABELS) as BannerCorner[]).map((corner) => (
-          <div className="field" key={corner}>
-            <label htmlFor={`corner-${corner}`}>{BANNER_CORNER_LABELS[corner]}</label>
-            <select
-              id={`corner-${corner}`}
-              value={textBanner.corners[corner]}
-              onChange={(event) =>
-                updateCorner(corner, event.target.value as SensorFieldId)
-              }
-            >
-              {SENSOR_FIELD_GROUPS.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
-
-      <div
-        className="text-banner-preview"
-        style={{
-          backgroundColor: textBanner.backgroundColor,
-          color: textBanner.textColor,
-        }}
-      >
-        {(Object.keys(cornerPositions) as BannerCorner[]).map((corner) => {
-          const label = formatCornerLabel(textBanner.corners[corner], sensorValues);
-          if (!label) {
-            return null;
-          }
-
-          return (
-            <span
-              key={corner}
-              className={`text-banner-corner ${cornerPositions[corner]}`}
-              style={{ color: textBanner.cornerColor }}
-            >
-              {label}
-            </span>
-          );
-        })}
-        <span className="text-banner-center">
-          {textBanner.text.trim() || "Preview"}
-        </span>
-      </div>
-      <p className="muted" style={{ marginTop: 10 }}>
-        Preview approximates the 960×376 case display. Corner values refresh
-        every few seconds when sensors are available.
-      </p>
-    </div>
-  );
-}
-
-function SensorsPanel({ refreshToken }: { refreshToken: number }) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [panelRunning, setPanelRunning] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchSensors = useCallback(async () => {
-    try {
-      const response = await apiFetch("/api/sensors");
-      const data = await response.json();
-      if (data.ok) {
-        setValues(data.values ?? {});
-        setPanelRunning(Boolean(data.panelRunning));
-        setUpdatedAt(data.updatedAt ?? null);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSensors();
-    const interval = window.setInterval(fetchSensors, 4000);
-    return () => window.clearInterval(interval);
-  }, [fetchSensors, refreshToken]);
-
-  const highlights = [
-    ["cpu_usage_percent", "CPU usage"],
-    ["temperature_cpu", "CPU temp"],
-    ["mem_usage_percent", "RAM usage"],
-    ["fan_primary_rpm", "Fan 1"],
-    ["storage_ssd_0_used", "SSD 1 usage"],
-    ["storage_hdd_0_used", "HDD 1 usage"],
-  ] as const;
-
-  return (
-    <section className="card">
-      <div className="logs-header">
-        <h2>Live sensor data</h2>
-        <span className={`badge ${panelRunning ? "badge-on" : "badge-off"}`}>
-          {panelRunning ? "Dashboard running" : "Dashboard stopped"}
-        </span>
-      </div>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Values written to the case display when &quot;System dashboard&quot; is
-        active. Network and disk fields may need a custom sensor mapping on
-        TrueNAS.
-      </p>
-
-      {loading ? <p className="muted">Loading sensor snapshot…</p> : null}
-
-      {!loading && Object.keys(values).length === 0 ? (
-        <p className="muted">
-          No sensor file yet. Apply &quot;System dashboard (live)&quot; and wait
-          a few seconds.
-        </p>
-      ) : null}
-
-      {Object.keys(values).length > 0 ? (
-        <>
-          <div className="sensor-grid">
-            {highlights.map(([key, label]) => {
-              const displayValue =
-                values[key] ??
-                (key === "cpu_usage_percent" ? values.cpu_percent : undefined) ??
-                (key === "storage_ssd_0_used"
-                  ? values["storage_ssd[0]['used']"]
-                  : undefined) ??
-                (key === "storage_hdd_0_used"
-                  ? values["storage_hdd[0]['used']"]
-                  : undefined) ??
-                "—";
-
-              return (
-              <div className="sensor-tile" key={key}>
-                <span className="sensor-label">{label}</span>
-                <strong>{displayValue}</strong>
-              </div>
-              );
-            })}
-          </div>
-          {updatedAt ? (
-            <p className="muted" style={{ marginTop: 12 }}>
-              Last update: {formatTime(updatedAt)}
-            </p>
-          ) : null}
-        </>
-      ) : null}
-    </section>
-  );
-}
-
-function LogsPanel({
-  refreshToken,
-  onClear,
-}: {
-  refreshToken: number;
-  onClear: () => void;
-}) {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const panelRef = useRef<HTMLPreElement>(null);
-
-  const fetchLogs = useCallback(async () => {
-    try {
-      const response = await apiFetch("/api/logs?limit=200");
-      const data = await response.json();
-      if (data.ok) {
-        setLogs(data.logs);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLogs();
-    const interval = window.setInterval(fetchLogs, 3000);
-    return () => window.clearInterval(interval);
-  }, [fetchLogs, refreshToken]);
-
-  useEffect(() => {
-    if (panelRef.current) {
-      panelRef.current.scrollTop = panelRef.current.scrollHeight;
-    }
-  }, [logs]);
-
-  async function clearLogs() {
-    await apiFetch("/api/logs", { method: "DELETE" });
-    setLogs([]);
-    onClear();
-  }
-
-  return (
-    <section className="card logs-card">
-      <div className="logs-header">
-        <h2>Activity log</h2>
-        <div className="actions">
-          <button className="btn btn-secondary" onClick={() => fetchLogs()}>
-            Refresh
-          </button>
-          <button className="btn btn-danger" onClick={clearLogs}>
-            Clear
-          </button>
-        </div>
-      </div>
-
-      <pre className="logs-panel" ref={panelRef}>
-        {loading && logs.length === 0 ? (
-          <div className="log-line">Loading logs…</div>
-        ) : null}
-        {!loading && logs.length === 0 ? (
-          <div className="log-line">No log entries yet.</div>
-        ) : null}
-        {logs.map((entry, index) => (
-          <div className="log-line" key={`${entry.ts}-${index}`}>
-            <span className="log-time">{formatTime(entry.ts)}</span>{" "}
-            <span className={`log-level-${entry.level}`}>
-              [{entry.level.toUpperCase()}]
-            </span>{" "}
-            <span className="log-source">[{entry.source}]</span> {entry.message}
-            {entry.detail ? (
-              <>
-                {" "}
-                <span className="log-detail">— {entry.detail}</span>
-              </>
-            ) : null}
-          </div>
-        ))}
-      </pre>
-    </section>
-  );
-}
+import { configsEqual } from "@/lib/config-utils";
+import { getModeMeta } from "@/lib/mode-meta";
+import type { DisplayConfig } from "@/lib/types";
 
 export default function Dashboard() {
   const [authRequired, setAuthRequired] = useState<boolean | null>(null);
   const [tokenInput, setTokenInput] = useState(getStoredApiToken());
+  const [savedConfig, setSavedConfig] = useState<DisplayConfig | null>(null);
   const [config, setConfig] = useState<DisplayConfig | null>(null);
-  const [status, setStatus] = useState<string>("Loading settings…");
+  const [status, setStatus] = useState("Einstellungen werden geladen…");
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [logRefreshToken, setLogRefreshToken] = useState(0);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [sensorValues, setSensorValues] = useState<Record<string, string>>({});
+  const [panelRunning, setPanelRunning] = useState(false);
 
-  function bumpLogs() {
-    setLogRefreshToken((value) => value + 1);
+  const isDirty =
+    savedConfig !== null &&
+    config !== null &&
+    !configsEqual(savedConfig, config);
+
+  function bumpRefresh() {
+    setRefreshToken((value) => value + 1);
   }
 
   const loadConfig = useCallback(async () => {
@@ -496,16 +46,30 @@ export default function Dashboard() {
 
     if (response.status === 401) {
       setAuthRequired(true);
-      setStatus("API token required.");
+      setStatus("API-Token erforderlich.");
       setError(true);
       return false;
     }
 
     const data = await response.json();
+    setSavedConfig(data);
     setConfig(data);
-    setStatus("Settings loaded.");
+    setStatus("Bereit.");
     setError(false);
     return true;
+  }, []);
+
+  const fetchSensors = useCallback(async () => {
+    try {
+      const response = await apiFetch("/api/sensors");
+      const data = await response.json();
+      if (data.ok) {
+        setSensorValues(data.values ?? {});
+        setPanelRunning(Boolean(data.panelRunning));
+      }
+    } catch {
+      // Preview works without live sensor data.
+    }
   }, []);
 
   useEffect(() => {
@@ -516,14 +80,22 @@ export default function Dashboard() {
         if (!data.authRequired || getStoredApiToken()) {
           void loadConfig();
         } else {
-          setStatus("Enter your API token to continue.");
+          setStatus("Gib dein API-Token ein, um fortzufahren.");
         }
       })
       .catch(() => {
-        setStatus("Failed to load app status.");
+        setStatus("App-Status konnte nicht geladen werden.");
         setError(true);
       });
   }, [loadConfig]);
+
+  useEffect(() => {
+    if (!config) return;
+
+    void fetchSensors();
+    const interval = window.setInterval(fetchSensors, 4000);
+    return () => window.clearInterval(interval);
+  }, [config, fetchSensors, refreshToken]);
 
   async function submitToken() {
     storeApiToken(tokenInput);
@@ -538,7 +110,7 @@ export default function Dashboard() {
 
     const payload = next ?? config;
     setSaving(true);
-    setStatus("Applying display settings…");
+    setStatus("Display wird aktualisiert…");
     setError(false);
 
     try {
@@ -550,25 +122,33 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Failed to save settings");
+        throw new Error(data.error || "Speichern fehlgeschlagen");
       }
 
+      setSavedConfig(data.config);
       setConfig(data.config);
-      setStatus("Display updated successfully.");
-      bumpLogs();
+      setStatus("Display erfolgreich aktualisiert.");
+      bumpRefresh();
     } catch (saveError) {
       const message =
-        saveError instanceof Error ? saveError.message : "Unknown error";
+        saveError instanceof Error ? saveError.message : "Unbekannter Fehler";
       setStatus(message);
       setError(true);
-      bumpLogs();
+      bumpRefresh();
     } finally {
       setSaving(false);
     }
   }
 
+  function discardChanges() {
+    if (savedConfig) {
+      setConfig(savedConfig);
+      setStatus("Änderungen verworfen.");
+      setError(false);
+    }
+  }
+
   async function quickAction(action: "on" | "off" | "sensors") {
-    setStatus(`Running ${action}…`);
     setError(false);
 
     try {
@@ -580,17 +160,22 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Command failed");
+        throw new Error(data.error || "Befehl fehlgeschlagen");
       }
 
-      setStatus(`Quick action "${action}" applied.`);
-      bumpLogs();
+      const labels = {
+        on: "TrueNAS Logo angezeigt",
+        sensors: "System-Dashboard gestartet",
+        off: "Display ausgeschaltet",
+      };
+      setStatus(labels[action]);
+      bumpRefresh();
     } catch (actionError) {
       const message =
-        actionError instanceof Error ? actionError.message : "Unknown error";
+        actionError instanceof Error ? actionError.message : "Unbekannter Fehler";
       setStatus(message);
       setError(true);
-      bumpLogs();
+      bumpRefresh();
     }
   }
 
@@ -598,7 +183,7 @@ export default function Dashboard() {
     const formData = new FormData();
     formData.append("file", file);
     setUploading(true);
-    setStatus("Uploading custom image…");
+    setStatus("Bild wird hochgeladen…");
     setError(false);
 
     try {
@@ -609,18 +194,19 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Upload failed");
+        throw new Error(data.error || "Upload fehlgeschlagen");
       }
 
+      setSavedConfig(data.config);
       setConfig(data.config);
-      setStatus("Custom image uploaded and applied.");
-      bumpLogs();
+      setStatus("Eigenes Bild hochgeladen und angewendet.");
+      bumpRefresh();
     } catch (uploadError) {
       const message =
-        uploadError instanceof Error ? uploadError.message : "Unknown error";
+        uploadError instanceof Error ? uploadError.message : "Unbekannter Fehler";
       setStatus(message);
       setError(true);
-      bumpLogs();
+      bumpRefresh();
     } finally {
       setUploading(false);
     }
@@ -628,215 +214,190 @@ export default function Dashboard() {
 
   if (authRequired && !config) {
     return (
-      <main className="page">
-        <header className="hero">
-          <div className="eyebrow">AOOSTAR WTR Max</div>
-          <h1>Display Control</h1>
-          <p>Enter the API token configured in your container environment.</p>
-        </header>
-        <section className="card">
-          <div className="field">
-            <label htmlFor="api-token">API token</label>
-            <input
-              id="api-token"
-              type="password"
-              value={tokenInput}
-              onChange={(event) => setTokenInput(event.target.value)}
-            />
-          </div>
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={submitToken}>
-              Continue
-            </button>
-          </div>
-          <p className="muted" style={{ marginTop: 10 }}>
-            Set `API_TOKEN` in Portainer. The token is stored only in this
-            browser session.
-          </p>
-        </section>
-        <div className={`status ${error ? "error" : ""}`} style={{ marginTop: 18 }}>
+      <AuthScreen
+        tokenInput={tokenInput}
+        status={status}
+        error={error}
+        onTokenChange={setTokenInput}
+        onSubmit={submitToken}
+      />
+    );
+  }
+
+  if (!config) {
+    return (
+      <main className="app-shell app-shell-centered">
+        <div className={`toast ${error ? "toast-error" : "toast-info"}`}>
           {status}
         </div>
       </main>
     );
   }
 
-  if (!config) {
-    return (
-      <main className="page">
-        <div className={`status ${error ? "error" : ""}`}>{status}</div>
-      </main>
-    );
-  }
+  const modeMeta = getModeMeta(config.displayMode);
 
   return (
-    <main className="page">
-      <header className="hero">
-        <div className="eyebrow">AOOSTAR WTR Max</div>
-        <h1>Display Control</h1>
-        <p>
-          Control the embedded case display: TrueNAS logo, live system
-          dashboard, text banner, custom image, timer, or off.
-        </p>
+    <main className="app-shell">
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">AOOSTAR WTR Max</p>
+          <h1>Display Control</h1>
+          <p className="lede">
+            Steuere das Gehäuse-Display — mit sinnvollen Standardwerten, die du
+            bei Bedarf anpassen kannst.
+          </p>
+        </div>
+        <div className="quick-actions">
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => quickAction("on")}
+          >
+            Logo
+          </button>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => quickAction("sensors")}
+          >
+            Dashboard
+          </button>
+          <button
+            className="btn btn-ghost btn-danger-text"
+            type="button"
+            onClick={() => quickAction("off")}
+          >
+            Aus
+          </button>
+        </div>
       </header>
 
-      <div className={`status ${error ? "error" : ""}`}>{status}</div>
+      <DisplayPreview
+        config={config}
+        sensorValues={sensorValues}
+        panelRunning={panelRunning}
+      />
 
-      <div className="grid" style={{ marginTop: 18 }}>
-        <section className="card">
-          <h2>Display mode</h2>
+      <section className="panel">
+        <div className="section-head">
+          <h2>Anzeigemodus</h2>
+          <p>Wähle, was auf dem Display erscheinen soll.</p>
+        </div>
+        <ModePicker
+          value={config.displayMode}
+          onChange={(displayMode) => setConfig({ ...config, displayMode })}
+        />
+      </section>
+
+      <section className="panel panel-accent">
+        <div className="section-head">
+          <h2>{modeMeta.title}</h2>
+          <p>{modeMeta.subtitle}</p>
+        </div>
+
+        {config.displayMode === "truenas" ? (
+          <p className="hint">
+            Standardmodus — kein Setup nötig. Das TrueNAS-Logo wird bei jedem
+            Container-Start angezeigt.
+          </p>
+        ) : null}
+
+        {config.displayMode === "sensors" ? (
           <div className="stack">
-            {MODE_OPTIONS.map((option) => (
-              <label className="option" key={option.value}>
-                <input
-                  type="radio"
-                  name="displayMode"
-                  checked={config.displayMode === option.value}
-                  onChange={() =>
-                    setConfig({ ...config, displayMode: option.value })
-                  }
-                />
-                <div>
-                  <strong>{option.title}</strong>
-                  <span>{option.description}</span>
-                  {option.hint ? <span className="option-hint">{option.hint}</span> : null}
-                </div>
-              </label>
-            ))}
+            <p className="hint">
+              Zeigt das offizielle AOOSTAR-Panel mit CPU, RAM, GPU, Netzwerk und
+              Speicher. Für Live-Daten braucht der Container read-only Mounts von{" "}
+              <code>/proc</code> und <code>/sys</code>.
+            </p>
           </div>
+        ) : null}
 
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button
-              className="btn btn-primary"
-              disabled={saving}
-              onClick={() => saveConfig()}
-            >
-              {saving ? "Applying…" : "Apply settings"}
-            </button>
-          </div>
-        </section>
-
-        <section className="stack">
-          <div className="card">
-            <h2>Quick actions</h2>
-            <div className="actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => quickAction("on")}
-              >
-                Show TrueNAS logo
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => quickAction("sensors")}
-              >
-                Start system dashboard
-              </button>
-              <button
-                className="btn btn-danger"
-                onClick={() => quickAction("off")}
-              >
-                Display off
-              </button>
-            </div>
-          </div>
-
+        {config.displayMode === "text" ? (
           <TextBannerEditor
-            active={config.displayMode === "text"}
             textBanner={config.textBanner}
             onChange={(textBanner) => setConfig({ ...config, textBanner })}
           />
+        ) : null}
 
-          <div className="card">
-            <h2>Custom upload</h2>
-            <div className="field">
-              <label htmlFor="logo-upload">Image file</label>
-              <input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                disabled={uploading}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) uploadImage(file);
-                }}
-              />
-            </div>
-            <p className="muted" style={{ marginTop: 10 }}>
-              Best size: 960×376. Other sizes are scaled automatically.
-            </p>
+        {config.displayMode === "custom" ? (
+          <div className="stack">
+            <CustomUpload uploading={uploading} onUpload={uploadImage} />
+            {config.customImagePath ? (
+              <p className="hint">
+                Aktuelles Bild: <code>{config.customImagePath}</code>
+              </p>
+            ) : (
+              <p className="hint">
+                Noch kein Bild hochgeladen. Wähle eine Datei — sie wird direkt
+                angewendet.
+              </p>
+            )}
           </div>
+        ) : null}
 
-          <div className="card">
-            <h2>Timer</h2>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={config.schedule.enabled}
-                onChange={(event) =>
-                  setConfig({
-                    ...config,
-                    schedule: {
-                      ...config.schedule,
-                      enabled: event.target.checked,
-                    },
-                  })
-                }
-              />
-              <span>Enable daily on/off schedule</span>
-            </label>
+        {config.displayMode === "off" ? (
+          <p className="hint">
+            Schaltet das eingebaute LCD komplett aus. Zum Wiederherstellen einen
+            anderen Modus wählen und übernehmen.
+          </p>
+        ) : null}
+      </section>
 
-            <div className="row" style={{ marginTop: 14 }}>
-              <div className="field">
-                <label htmlFor="on-time">Display on</label>
-                <input
-                  id="on-time"
-                  type="time"
-                  value={config.schedule.displayOnTime}
-                  onChange={(event) =>
-                    setConfig({
-                      ...config,
-                      schedule: {
-                        ...config.schedule,
-                        displayOnTime: event.target.value,
-                      },
-                    })
-                  }
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="off-time">Display off</label>
-                <input
-                  id="off-time"
-                  type="time"
-                  value={config.schedule.displayOffTime}
-                  onChange={(event) =>
-                    setConfig({
-                      ...config,
-                      schedule: {
-                        ...config.schedule,
-                        displayOffTime: event.target.value,
-                      },
-                    })
-                  }
-                />
-              </div>
-            </div>
+      <CollapsibleSection
+        title="Zeitplan"
+        description="Display täglich automatisch ein- und ausschalten"
+        badge={config.schedule.enabled ? "Aktiv" : "Aus"}
+      >
+        <ScheduleEditor
+          schedule={config.schedule}
+          onChange={(schedule) => setConfig({ ...config, schedule })}
+        />
+      </CollapsibleSection>
 
-            <p className="muted" style={{ marginTop: 10 }}>
-              During the off window the LCD is switched off. Inside the on
-              window your selected display mode is restored.
-            </p>
+      <CollapsibleSection
+        title="Live-Sensoren"
+        description="Aktuelle Werte vom Host-System"
+        badge={panelRunning ? "Läuft" : "Gestoppt"}
+      >
+        <SensorsPanel refreshToken={refreshToken} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Protokoll"
+        description="Letzte Aktionen und Fehler"
+        badge="Erweitert"
+      >
+        <LogsPanel
+          refreshToken={refreshToken}
+          onClear={() => setStatus("Protokoll geleert.")}
+        />
+      </CollapsibleSection>
+
+      <div className="status-bar is-visible">
+        <div className={`toast ${error ? "toast-error" : "toast-info"}`}>
+          {status}
+        </div>
+        {isDirty ? (
+          <div className="status-actions">
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={saving}
+              onClick={discardChanges}
+            >
+              Verwerfen
+            </button>
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={saving}
+              onClick={() => saveConfig()}
+            >
+              {saving ? "Wird übernommen…" : "Übernehmen"}
+            </button>
           </div>
-        </section>
+        ) : null}
       </div>
-
-      <SensorsPanel refreshToken={logRefreshToken} />
-
-      <LogsPanel
-        refreshToken={logRefreshToken}
-        onClear={() => setStatus("Logs cleared.")}
-      />
     </main>
   );
 }

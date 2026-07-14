@@ -1,0 +1,212 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  BANNER_CORNER_LABELS,
+  SENSOR_FIELD_GROUPS,
+  type BannerCorner,
+  type SensorFieldId,
+} from "@/lib/sensor-fields";
+import type { TextBannerSettings } from "@/lib/types";
+
+const COLOR_PRESETS = [
+  {
+    name: "TrueNAS",
+    textColor: "#e8eef8",
+    backgroundColor: "#0b1220",
+    cornerColor: "#9aa8c2",
+  },
+  {
+    name: "Hell",
+    textColor: "#0b1220",
+    backgroundColor: "#f4f7fb",
+    cornerColor: "#526075",
+  },
+  {
+    name: "Kontrast",
+    textColor: "#00d4aa",
+    backgroundColor: "#05070d",
+    cornerColor: "#7ee7c6",
+  },
+] as const;
+
+function normalizeHexColor(value: string, fallback: string): string {
+  const trimmed = value.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
+}
+
+export function TextBannerEditor({
+  textBanner,
+  onChange,
+}: {
+  textBanner: TextBannerSettings;
+  onChange: (next: TextBannerSettings) => void;
+}) {
+  const [showCorners, setShowCorners] = useState(
+    Object.values(textBanner.corners).some((value) => value !== "none"),
+  );
+
+  function updateColor(
+    key: "textColor" | "backgroundColor" | "cornerColor",
+    value: string,
+    fallback: string,
+  ) {
+    onChange({
+      ...textBanner,
+      [key]: normalizeHexColor(value, fallback),
+    });
+  }
+
+  function updateCorner(corner: BannerCorner, value: SensorFieldId) {
+    onChange({
+      ...textBanner,
+      corners: { ...textBanner.corners, [corner]: value },
+    });
+  }
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <label htmlFor="banner-text">Schriftzug</label>
+        <textarea
+          id="banner-text"
+          rows={2}
+          maxLength={80}
+          value={textBanner.text}
+          placeholder="z. B. TrueNAS SCALE"
+          onChange={(event) =>
+            onChange({ ...textBanner, text: event.target.value })
+          }
+        />
+        <span className="field-hint">{textBanner.text.length}/80 Zeichen</span>
+      </div>
+
+      <div className="preset-row">
+        {COLOR_PRESETS.map((preset) => (
+          <button
+            key={preset.name}
+            type="button"
+            className="preset-chip"
+            onClick={() =>
+              onChange({
+                ...textBanner,
+                textColor: preset.textColor,
+                backgroundColor: preset.backgroundColor,
+                cornerColor: preset.cornerColor,
+              })
+            }
+          >
+            <span
+              className="preset-swatch"
+              style={{ background: preset.backgroundColor }}
+            />
+            {preset.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="color-grid">
+        <ColorField
+          id="banner-text-color"
+          label="Textfarbe"
+          value={textBanner.textColor}
+          onChange={(value) =>
+            updateColor("textColor", value, textBanner.textColor)
+          }
+        />
+        <ColorField
+          id="banner-bg-color"
+          label="Hintergrund"
+          value={textBanner.backgroundColor}
+          onChange={(value) =>
+            updateColor("backgroundColor", value, textBanner.backgroundColor)
+          }
+        />
+        <ColorField
+          id="banner-corner-color"
+          label="Ecken"
+          value={textBanner.cornerColor}
+          onChange={(value) =>
+            updateColor("cornerColor", value, textBanner.cornerColor)
+          }
+        />
+      </div>
+
+      <button
+        type="button"
+        className="inline-toggle"
+        onClick={() => setShowCorners((value) => !value)}
+      >
+        {showCorners ? "Ecken-Sensoren ausblenden" : "Live-Daten in Ecken anzeigen"}
+      </button>
+
+      {showCorners ? (
+        <div className="corner-grid">
+          {(Object.keys(BANNER_CORNER_LABELS) as BannerCorner[]).map((corner) => (
+            <div className="field" key={corner}>
+              <label htmlFor={`corner-${corner}`}>
+                {BANNER_CORNER_LABELS[corner]}
+              </label>
+              <select
+                id={`corner-${corner}`}
+                value={textBanner.corners[corner]}
+                onChange={(event) =>
+                  updateCorner(corner, event.target.value as SensorFieldId)
+                }
+              >
+                {SENSOR_FIELD_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          ))}
+          <p className="hint span-2">
+            Für Live-Werte braucht der Container read-only Mounts von{" "}
+            <code>/proc</code> und <code>/sys</code>.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ColorField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <div className="color-input">
+        <input
+          id={id}
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <input
+          type="text"
+          value={value}
+          spellCheck={false}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
