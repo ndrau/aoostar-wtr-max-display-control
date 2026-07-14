@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 import { quickCommand } from "@/lib/display";
 import { appendLog } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const body = (await request.json()) as { action?: "on" | "off" | "original" };
     const action = body.action;

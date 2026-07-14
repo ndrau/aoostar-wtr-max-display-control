@@ -12,5 +12,7 @@ services:
       DATA_DIR: /data
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      TZ: Europe/Berlin
+      API_TOKEN: change-me-to-a-long-random-token
     volumes:
       - /mnt/AndysFastStorage/docker/aoostar-display:/data

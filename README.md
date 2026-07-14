@@ -52,6 +52,8 @@ Example from AOOSTAR WTR Max:
 
 Settings are stored in the mounted volume at `/data/config.json`. Logs are stored at `/data/logs/display.log`.
 
+Set `API_TOKEN` in the container environment before exposing the UI on your network.
+
 ## Local build
 
 ```bash
@@ -76,6 +78,9 @@ services:
       - /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0
     volumes:
       - /mnt/AndysFastStorage/docker/aoostar-display:/data
+    environment:
+      API_TOKEN: change-me-to-a-long-random-token
+      TZ: Europe/Berlin
 ```
 
 ## Environment variables
@@ -85,14 +90,31 @@ services:
 | `DEVICE` | `/dev/ttyACM0` | Serial device inside the container |
 | `DATA_DIR` | `/data` | Persistent config and uploads |
 | `PORT` | `3000` | Web UI port inside the container |
+| `API_TOKEN` | unset | Protects all `/api/*` routes when set |
+| `TZ` | UTC | Scheduler timezone, e.g. `Europe/Berlin` |
 | `TRUENAS_LOGO_PATH` | `/app/assets/truenas-scale.png` | Built-in splash image |
 
 ## Security
 
 - No `privileged` mode
 - Only one serial device is passed through (`devices:`)
-- Prefer `/dev/serial/by-id/...` over `/dev/ttyACM0` for stable mapping
-- Mount `/data` on your pool so settings survive container updates
+- Only `/data` is bind-mounted on the host
+- `asterctl` is executed with argument arrays, not shell commands
+- Uploads are limited to 10 MB and restricted to `/data/uploads/`
+- Custom image paths are validated and cannot escape the uploads directory
+- Display commands are serialized to avoid concurrent serial port access
+- Set `API_TOKEN` in the container environment to protect the web API
+
+### TrueNAS safety
+
+This container is intentionally narrow in scope:
+
+- It does **not** modify TrueNAS system files, pools, datasets, or services
+- It does **not** require host networking or additional host mounts
+- It only talks to the AOOSTAR case display over USB serial
+- Persistent files are limited to `/data` on your chosen dataset
+
+Recommended: use a long random `API_TOKEN`, keep port `3910` on your LAN only, and avoid exposing the UI to the public internet.
 
 ## GitHub Container Registry
 

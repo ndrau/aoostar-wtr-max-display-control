@@ -3,8 +3,8 @@ ARG ASTERCTL_VERSION=v0.2.0
 FROM node:20-bookworm-slim AS web-builder
 
 WORKDIR /build
-COPY web/package.json ./
-RUN npm install
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
 
 COPY web/ ./
 RUN npm run build

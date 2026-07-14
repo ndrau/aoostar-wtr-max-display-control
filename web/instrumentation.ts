@@ -3,6 +3,16 @@ export async function register() {
     const { appendLog } = await import("./lib/logger");
     const { startScheduler } = await import("./lib/scheduler");
 
+    if (!process.env.API_TOKEN?.trim()) {
+      await appendLog(
+        "warn",
+        "security",
+        "API_TOKEN is not set; web API is open to anyone who can reach this port",
+      );
+    } else {
+      await appendLog("info", "security", "API token protection enabled");
+    }
+
     await appendLog("info", "system", "Web UI started");
     startScheduler();
   }

@@ -14,6 +14,7 @@ export interface LogEntry {
 
 export const LOG_PATH = path.join(DATA_DIR, "logs", "display.log");
 const MAX_LOG_LINES = 500;
+let appendChain: Promise<void> = Promise.resolve();
 
 async function ensureLogDir() {
   await mkdir(path.dirname(LOG_PATH), { recursive: true });
@@ -35,7 +36,7 @@ async function trimLogFile() {
   }
 }
 
-export async function appendLog(
+async function appendLogUnsafe(
   level: LogLevel,
   source: string,
   message: string,
@@ -57,13 +58,40 @@ export async function appendLog(
   return entry;
 }
 
+export async function appendLog(
+  level: LogLevel,
+  source: string,
+  message: string,
+  detail?: string,
+): Promise<LogEntry> {
+  const next = appendChain.then(() =>
+    appendLogUnsafe(level, source, message, detail),
+  );
+  appendChain = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
+}
+
 export async function readLogs(limit = 200): Promise<LogEntry[]> {
   try {
     const raw = await readFile(LOG_PATH, "utf8");
-    const entries = raw
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as LogEntry);
+    const entries: LogEntry[] = [];
+
+    for (const line of raw.split("\n").filter(Boolean)) {
+      try {
+        entries.push(JSON.parse(line) as LogEntry);
+      } catch {
+        entries.push({
+          ts: new Date().toISOString(),
+          level: "warn",
+          source: "logger",
+          message: "Skipped corrupt log line",
+          detail: line,
+        });
+      }
+    }
 
     return entries.slice(-limit);
   } catch {

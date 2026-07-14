@@ -7,20 +7,24 @@ async function ensureDataDir() {
   await mkdir(UPLOAD_DIR, { recursive: true });
 }
 
+export function mergeConfig(parsed: Partial<DisplayConfig>): DisplayConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...parsed,
+    schedule: {
+      ...DEFAULT_CONFIG.schedule,
+      ...parsed.schedule,
+    },
+  };
+}
+
 export async function readConfig(): Promise<DisplayConfig> {
   await ensureDataDir();
 
   try {
     const raw = await readFile(CONFIG_PATH, "utf8");
     const parsed = JSON.parse(raw) as Partial<DisplayConfig>;
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-      schedule: {
-        ...DEFAULT_CONFIG.schedule,
-        ...parsed.schedule,
-      },
-    };
+    return mergeConfig(parsed);
   } catch {
     await writeConfig(DEFAULT_CONFIG);
     return DEFAULT_CONFIG;

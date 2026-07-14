@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  apiFetch,
+  getStoredApiToken,
+  storeApiToken,
+} from "@/lib/client-auth";
 import type { DisplayConfig, DisplayMode } from "@/lib/types";
 
 interface LogEntry {
@@ -55,7 +60,7 @@ function LogsPanel({
 
   const fetchLogs = useCallback(async () => {
     try {
-      const response = await fetch("/api/logs?limit=200");
+      const response = await apiFetch("/api/logs?limit=200");
       const data = await response.json();
       if (data.ok) {
         setLogs(data.logs);
@@ -78,7 +83,7 @@ function LogsPanel({
   }, [logs]);
 
   async function clearLogs() {
-    await fetch("/api/logs", { method: "DELETE" });
+    await apiFetch("/api/logs", { method: "DELETE" });
     setLogs([]);
     onClear();
   }
@@ -125,6 +130,8 @@ function LogsPanel({
 }
 
 export default function Dashboard() {
+  const [authRequired, setAuthRequired] = useState<boolean | null>(null);
+  const [tokenInput, setTokenInput] = useState(getStoredApiToken());
   const [config, setConfig] = useState<DisplayConfig | null>(null);
   const [status, setStatus] = useState<string>("Loading settings…");
   const [error, setError] = useState(false);
@@ -136,19 +143,47 @@ export default function Dashboard() {
     setLogRefreshToken((value) => value + 1);
   }
 
+  const loadConfig = useCallback(async () => {
+    const response = await apiFetch("/api/config");
+
+    if (response.status === 401) {
+      setAuthRequired(true);
+      setStatus("API token required.");
+      setError(true);
+      return false;
+    }
+
+    const data = await response.json();
+    setConfig(data);
+    setStatus("Settings loaded.");
+    setError(false);
+    return true;
+  }, []);
+
   useEffect(() => {
-    fetch("/api/config")
+    fetch("/api/status")
       .then((response) => response.json())
-      .then((data: DisplayConfig) => {
-        setConfig(data);
-        setStatus("Settings loaded.");
-        setError(false);
+      .then((data: { authRequired: boolean }) => {
+        setAuthRequired(data.authRequired);
+        if (!data.authRequired || getStoredApiToken()) {
+          void loadConfig();
+        } else {
+          setStatus("Enter your API token to continue.");
+        }
       })
       .catch(() => {
-        setStatus("Failed to load settings.");
+        setStatus("Failed to load app status.");
         setError(true);
       });
-  }, []);
+  }, [loadConfig]);
+
+  async function submitToken() {
+    storeApiToken(tokenInput);
+    const ok = await loadConfig();
+    if (ok) {
+      setAuthRequired(false);
+    }
+  }
 
   async function saveConfig(next?: DisplayConfig) {
     if (!config) return;
@@ -159,7 +194,7 @@ export default function Dashboard() {
     setError(false);
 
     try {
-      const response = await fetch("/api/config", {
+      const response = await apiFetch("/api/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -189,7 +224,7 @@ export default function Dashboard() {
     setError(false);
 
     try {
-      const response = await fetch("/api/display", {
+      const response = await apiFetch("/api/display", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
@@ -219,7 +254,7 @@ export default function Dashboard() {
     setError(false);
 
     try {
-      const response = await fetch("/api/upload", {
+      const response = await apiFetch("/api/upload", {
         method: "POST",
         body: formData,
       });
@@ -241,6 +276,41 @@ export default function Dashboard() {
     } finally {
       setUploading(false);
     }
+  }
+
+  if (authRequired && !config) {
+    return (
+      <main className="page">
+        <header className="hero">
+          <div className="eyebrow">AOOSTAR WTR Max</div>
+          <h1>Display Control</h1>
+          <p>Enter the API token configured in your container environment.</p>
+        </header>
+        <section className="card">
+          <div className="field">
+            <label htmlFor="api-token">API token</label>
+            <input
+              id="api-token"
+              type="password"
+              value={tokenInput}
+              onChange={(event) => setTokenInput(event.target.value)}
+            />
+          </div>
+          <div className="actions" style={{ marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={submitToken}>
+              Continue
+            </button>
+          </div>
+          <p className="muted" style={{ marginTop: 10 }}>
+            Set `API_TOKEN` in Portainer. The token is stored only in this
+            browser session.
+          </p>
+        </section>
+        <div className={`status ${error ? "error" : ""}`} style={{ marginTop: 18 }}>
+          {status}
+        </div>
+      </main>
+    );
   }
 
   if (!config) {

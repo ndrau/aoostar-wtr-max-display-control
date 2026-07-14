@@ -1,6 +1,7 @@
 import { execFile } from "child_process";
 import { access } from "fs/promises";
 import { promisify } from "util";
+import { enqueueDisplayTask } from "./display-queue";
 import { appendLog } from "./logger";
 import { ASTERCTL_PATH, DEVICE, TRUENAS_LOGO_PATH } from "./paths";
 import type { DisplayConfig, DisplayMode } from "./types";
@@ -16,7 +17,7 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-export async function runAsterctl(args: string[]): Promise<string> {
+async function runAsterctlUnsafe(args: string[]): Promise<string> {
   const command = `${ASTERCTL_PATH} ${args.join(" ")}`;
   await appendLog("info", "asterctl", "Running command", command);
 
@@ -27,7 +28,6 @@ export async function runAsterctl(args: string[]): Promise<string> {
     });
 
     const output = stderr?.trim() || stdout?.trim() || "Command completed";
-
     await appendLog("info", "asterctl", "Command finished", output);
     return output;
   } catch (error) {
@@ -35,6 +35,10 @@ export async function runAsterctl(args: string[]): Promise<string> {
     await appendLog("error", "asterctl", "Command failed", message);
     throw error;
   }
+}
+
+export async function runAsterctl(args: string[]): Promise<string> {
+  return enqueueDisplayTask(() => runAsterctlUnsafe(args));
 }
 
 export function resolveModeArgs(
