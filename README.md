@@ -1,4 +1,4 @@
-# AOOSTAR WTR Max Display
+# AOOSTAR WTR Max Display Control
 
 Docker image and web UI to control the embedded LCD on the **AOOSTAR WTR Max** (and GEM12+ PRO) from Linux — e.g. **TrueNAS Scale** via Portainer.
 
@@ -14,7 +14,7 @@ Uses [`asterctl`](https://github.com/zehnm/aoostar-rs) under the hood. The displ
 Published image:
 
 ```text
-ghcr.io/ndrau/aoostar-wtr-max-display:latest
+ghcr.io/ndrau/aoostar-wtr-max-display-control:latest
 ```
 
 ## Quick start (Portainer / TrueNAS)
@@ -57,27 +57,27 @@ Set `API_TOKEN` in the container environment before exposing the UI on your netw
 ## Local build
 
 ```bash
-docker build -t aoostar-wtr-max-display:local .
+docker build -t aoostar-wtr-max-display-control:local .
 docker run --rm -p 3910:3000 \
   --device /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0 \
   -v "$(pwd)/data:/data" \
-  aoostar-wtr-max-display:local
+  aoostar-wtr-max-display-control:local
 ```
 
 ## Compose example
 
 ```yaml
 services:
-  aoostar-display:
-    image: ghcr.io/ndrau/aoostar-wtr-max-display:latest
-    container_name: aoostar-display
+  aoostar-wtr-max-display-control:
+    image: ghcr.io/ndrau/aoostar-wtr-max-display-control:latest
+    container_name: aoostar-wtr-max-display-control
     restart: unless-stopped
     ports:
       - "3910:3000"
     devices:
       - /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0
     volumes:
-      - /mnt/AndysFastStorage/docker/aoostar-display:/data
+      - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
     environment:
       API_TOKEN: change-me-to-a-long-random-token
       TZ: Europe/Berlin
@@ -122,14 +122,14 @@ On push to `main` or tag `v*`, GitHub Actions publishes to GHCR.
 
 After the first publish, make the package **public** once (GitHub Actions cannot do this automatically):
 
-`https://github.com/users/ndrau/packages/container/package/aoostar-wtr-max-display/settings`
+https://github.com/ndrau/aoostar-wtr-max-display-control/pkgs/container/aoostar-wtr-max-display-control
 
 → **Change visibility** → **Public**
 
 Or from CLI after `gh auth refresh -h github.com -s read:packages,write:packages`:
 
 ```bash
-gh api --method PATCH /user/packages/container/aoostar-wtr-max-display -f visibility=public
+gh api --method PATCH /user/packages/container/aoostar-wtr-max-display-control -f visibility=public
 ```
 
 ## Credits

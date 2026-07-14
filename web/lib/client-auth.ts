@@ -1,6 +1,6 @@
 "use client";
 
-const TOKEN_STORAGE_KEY = "aoostar-display-api-token";
+const TOKEN_STORAGE_KEY = "aoostar-wtr-max-display-control-api-token";
 
 export function getStoredApiToken(): string {
   if (typeof window === "undefined") {

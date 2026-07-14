@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AOOSTAR Display",
+  title: "AOOSTAR WTR Max Display Control",
   description: "Control the AOOSTAR WTR Max embedded display",
 };
 

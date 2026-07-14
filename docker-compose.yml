@@ -1,7 +1,7 @@
 services:
-  aoostar-display:
-    image: ghcr.io/ndrau/aoostar-wtr-max-display:latest
-    container_name: aoostar-display
+  aoostar-wtr-max-display-control:
+    image: ghcr.io/ndrau/aoostar-wtr-max-display-control:latest
+    container_name: aoostar-wtr-max-display-control
     restart: unless-stopped
     ports:
       - "3910:3000"
@@ -15,4 +15,4 @@ services:
       TZ: Europe/Berlin
       API_TOKEN: change-me-to-a-long-random-token
     volumes:
-      - /mnt/AndysFastStorage/docker/aoostar-display:/data
+      - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
