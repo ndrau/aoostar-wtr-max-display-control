@@ -79,9 +79,17 @@ Sensor values must be supplied as text files (see [aoostar-rs docs](https://zehn
 
 On push to `main` or tag `v*`, GitHub Actions publishes to GHCR.
 
-After the first publish, make the package **public** (or authenticate Portainer with a GitHub PAT) under:
+After the first publish, make the package **public** once (GitHub Actions cannot do this automatically):
 
-`https://github.com/ndrau?tab=packages`
+`https://github.com/users/ndrau/packages/container/package/aoostar-wtr-max-display/settings`
+
+→ **Change visibility** → **Public**
+
+Or from CLI after `gh auth refresh -h github.com -s read:packages,write:packages`:
+
+```bash
+gh api --method PATCH /user/packages/container/aoostar-wtr-max-display -f visibility=public
+```
 
 ### Portainer with private GHCR package
 
