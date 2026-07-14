@@ -170,8 +170,8 @@ export function TextBannerEditor({
             </div>
           ))}
           <p className="hint span-2">
-            Für Live-Werte braucht der Container read-only Mounts von{" "}
-            <code>/proc</code> und <code>/sys</code>.
+            Für Live-Werte braucht der Container <code>pid: host</code> und ein
+            read-only Mount von <code>/sys</code>.
           </p>
         </div>
       ) : null}

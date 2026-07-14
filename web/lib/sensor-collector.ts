@@ -40,20 +40,25 @@ async function startSensorCollectorProcess(): Promise<void> {
     await mkdir(SENSOR_DIR, { recursive: true });
     await appendLog("info", "sensors", "Starting sensor data collector");
 
-    const processHandle = spawn(
-      ASTER_SYSINFO_PATH,
-      [
-        "--out",
-        `${SENSOR_DIR}/sysinfo.txt`,
-        "--temp-dir",
-        SENSOR_DIR,
-        "--refresh",
-        "3",
-        "--disk-refresh",
-        "60",
-      ],
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const smartctlEnabled = process.env.SMARTCTL_ENABLED !== "false";
+    const args = [
+      "--out",
+      `${SENSOR_DIR}/sysinfo.txt`,
+      "--temp-dir",
+      SENSOR_DIR,
+      "--refresh",
+      "3",
+      "--disk-refresh",
+      "60",
+    ];
+
+    if (smartctlEnabled) {
+      args.push("--smartctl");
+    }
+
+    const processHandle = spawn(ASTER_SYSINFO_PATH, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
     sysinfoProcess = processHandle;
 

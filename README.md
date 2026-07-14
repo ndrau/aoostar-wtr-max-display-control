@@ -66,15 +66,20 @@ The **System dashboard (live)** mode renders the original AOOSTAR-style panels u
 
 ### Required compose mounts
 
-Without host `/proc` and `/sys`, the dashboard would only show container stats.
-Add read-only host mounts:
+Without host visibility, the dashboard would only show container stats.
+Use host PID namespace plus a read-only `/sys` mount (do **not** bind-mount
+`/proc:ro` — Docker fails to start with an AppArmor error on TrueNAS and other
+hosts):
 
 ```yaml
+pid: host
 volumes:
   - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
-  - /proc:/proc:ro
   - /sys:/sys:ro
 ```
+
+`pid: host` lets `aster-sysinfo` read host CPU/RAM from the container's `/proc`.
+Fan RPM values come from `/sys/class/hwmon` via the `/sys` mount.
 
 Network speed, IP, and per-disk temperatures need interface-specific entries in
 the sensor mapping file. The default mapping ships CPU/RAM/GPU fields; extend
@@ -138,9 +143,9 @@ services:
       - "3910:3000"
     devices:
       - /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0
+    pid: host
     volumes:
       - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
-      - /proc:/proc:ro
       - /sys:/sys:ro
     environment:
       API_TOKEN: change-me-to-a-long-random-token
@@ -177,7 +182,7 @@ This container is intentionally narrow in scope:
 
 - It does **not** modify TrueNAS system files, pools, datasets, or services
 - It does **not** require host networking
-- For live sensors it mounts host `/proc` and `/sys` read-only (no `privileged`)
+- For live sensors use `pid: host` plus read-only `/sys` (no `privileged`, no `/proc` bind mount)
 - It only talks to the AOOSTAR case display over USB serial
 - Persistent files are limited to `/data` on your chosen dataset
 

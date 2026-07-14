@@ -9,7 +9,13 @@ import {
   stopPanelSensorMapper,
   writePanelSensorFile,
 } from "./sensor-panel-mapper";
-import { ASTERCTL_PATH, CONFIG_DIR, DEVICE, SENSOR_DIR } from "./paths";
+import {
+  ASTERCTL_PATH,
+  CONFIG_DIR,
+  DEVICE,
+  FONT_DIR,
+  SENSOR_DIR,
+} from "./paths";
 
 let panelProcess: ChildProcess | null = null;
 let panelRunning = false;
@@ -40,8 +46,12 @@ function killProcess(
   });
 }
 
+export function isPanelChildRunning(): boolean {
+  return panelProcess !== null && !panelProcess.killed;
+}
+
 export function isPanelModeRunning(): boolean {
-  return panelRunning;
+  return panelRunning || isPanelChildRunning();
 }
 
 export async function stopPanelMode(): Promise<void> {
@@ -74,6 +84,8 @@ export async function startPanelMode(): Promise<string> {
     "monitor.json",
     "--config-dir",
     CONFIG_DIR,
+    "--font-dir",
+    FONT_DIR,
     "--sensor-path",
     SENSOR_DIR,
   ];

@@ -420,3 +420,26 @@ export function getStorageUsageFallbacks(
 
   return fallbacks;
 }
+
+export function getStorageTemperatureFallbacks(
+  values: Record<string, string>,
+): Array<{ panelKey: string; sourceKey: string; value: string }> {
+  const fallbacks: Array<{ panelKey: string; sourceKey: string; value: string }> =
+    [];
+
+  for (const [sourceKey, value] of Object.entries(values)) {
+    const match = sourceKey.match(/^storage_(ssd|hdd)\[(\d+)\]_temperature$/);
+    if (!match || !value.trim()) {
+      continue;
+    }
+
+    const panelKey = `storage_${match[1]}[${match[2]}]['temperature']`;
+    if (values[panelKey] !== undefined) {
+      continue;
+    }
+
+    fallbacks.push({ panelKey, sourceKey, value });
+  }
+
+  return fallbacks;
+}

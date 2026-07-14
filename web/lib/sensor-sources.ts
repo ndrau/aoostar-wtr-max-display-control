@@ -5,6 +5,107 @@ import { SENSOR_DIR } from "./paths";
 
 const SYSINFO_FILE = path.join(SENSOR_DIR, "sysinfo.txt");
 const HWMON_ROOT = "/sys/class/hwmon";
+const NVME_ROOT = "/sys/class/nvme";
+const BLOCK_ROOT = "/sys/block";
+
+async function readFirstHwmonTemp(baseDir: string): Promise<number | undefined> {
+  try {
+    const hwmonEntries = await readdir(baseDir);
+
+    for (const hwmonEntry of hwmonEntries.sort()) {
+      if (!hwmonEntry.startsWith("hwmon")) {
+        continue;
+      }
+
+      const hwmonPath = path.join(baseDir, hwmonEntry);
+      const files = await readdir(hwmonPath);
+
+      for (const file of files) {
+        if (!/^temp\d+_input$/.test(file)) {
+          continue;
+        }
+
+        const raw = await readFile(path.join(hwmonPath, file), "utf8");
+        const milliCelsius = Number.parseInt(raw.trim(), 10);
+        if (!Number.isNaN(milliCelsius) && milliCelsius > 0) {
+          return milliCelsius / 1000;
+        }
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+async function readNvmeDiskTemperatures(): Promise<Record<string, string>> {
+  const values: Record<string, string> = {};
+
+  try {
+    const entries = (await readdir(NVME_ROOT))
+      .filter((entry) => /^nvme\d+$/.test(entry))
+      .sort();
+
+    for (const [index, entry] of entries.entries()) {
+      const temp = await readFirstHwmonTemp(
+        path.join(NVME_ROOT, entry, "device", "hwmon"),
+      );
+
+      if (temp !== undefined) {
+        values[`storage_ssd[${index}]_temperature`] = `${temp.toFixed(1)} °C`;
+      }
+    }
+  } catch {
+    return values;
+  }
+
+  return values;
+}
+
+async function readRotationalDiskTemperatures(): Promise<Record<string, string>> {
+  const values: Record<string, string> = {};
+
+  try {
+    const entries = (await readdir(BLOCK_ROOT))
+      .filter((entry) => /^sd[a-z]+$/.test(entry))
+      .sort();
+
+    let hddIndex = 0;
+
+    for (const entry of entries) {
+      const rotationalPath = path.join(BLOCK_ROOT, entry, "queue/rotational");
+      const removablePath = path.join(BLOCK_ROOT, entry, "removable");
+
+      let rotational = "1";
+      let removable = "0";
+
+      try {
+        rotational = (await readFile(rotationalPath, "utf8")).trim();
+        removable = (await readFile(removablePath, "utf8")).trim();
+      } catch {
+        continue;
+      }
+
+      if (removable === "1" || rotational !== "1") {
+        continue;
+      }
+
+      const temp = await readFirstHwmonTemp(
+        path.join(BLOCK_ROOT, entry, "device", "hwmon"),
+      );
+
+      if (temp !== undefined) {
+        values[`storage_hdd[${hddIndex}]_temperature`] = `${temp.toFixed(1)} °C`;
+        hddIndex += 1;
+      }
+    }
+  } catch {
+    return values;
+  }
+
+  return values;
+}
 
 export async function readHwmonSensors(): Promise<Record<string, string>> {
   const values: Record<string, string> = {};
@@ -85,10 +186,21 @@ export async function loadAllSensorValues(): Promise<Record<string, string>> {
   }
 
   const hwmonValues = await readHwmonSensors();
-  const merged = {
+  const nvmeTemps = await readNvmeDiskTemperatures();
+  const hddTemps = await readRotationalDiskTemperatures();
+  const merged: Record<string, string> = {
     ...sysinfoValues,
     ...hwmonValues,
+    ...nvmeTemps,
+    ...hddTemps,
   };
+
+  for (const [key, value] of Object.entries({ ...nvmeTemps, ...hddTemps })) {
+    const existing = merged[key];
+    if (!existing?.trim() || existing === "0" || existing === "0.0 °C") {
+      merged[key] = value;
+    }
+  }
 
   if (!merged.cpu_usage_percent) {
     const cpuUsage = deriveCpuUsagePercent(merged);

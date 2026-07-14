@@ -306,8 +306,8 @@ export default function Dashboard() {
           <div className="stack">
             <p className="hint">
               Zeigt das offizielle AOOSTAR-Panel mit CPU, RAM, GPU, Netzwerk und
-              Speicher. Für Live-Daten braucht der Container read-only Mounts von{" "}
-              <code>/proc</code> und <code>/sys</code>.
+              Speicher.               Für Live-Daten braucht der Container <code>pid: host</code> und ein
+              read-only Mount von <code>/sys</code>.
             </p>
           </div>
         ) : null}

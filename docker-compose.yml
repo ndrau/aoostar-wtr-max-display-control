@@ -3,6 +3,9 @@ services:
     image: ghcr.io/ndrau/aoostar-wtr-max-display-control:latest
     container_name: aoostar-wtr-max-display-control
     restart: unless-stopped
+    # Host process namespace so aster-sysinfo reads host /proc stats.
+    # Do NOT bind-mount /proc:ro — Docker/runc needs a writable /proc at startup.
+    pid: host
     ports:
       - "3910:3000"
     devices:
@@ -16,6 +19,4 @@ services:
       API_TOKEN: change-me-to-a-long-random-token
     volumes:
       - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
-      # Host stats for live sensor dashboard (read-only, no privileged mode)
-      - /proc:/proc:ro
       - /sys:/sys:ro

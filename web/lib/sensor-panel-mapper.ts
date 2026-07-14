@@ -4,6 +4,7 @@ import { appendLog } from "./logger";
 import { CONFIG_DIR, SENSOR_DIR, SENSOR_MAPPING } from "./paths";
 import {
   getStoragePanelKeys,
+  getStorageTemperatureFallbacks,
   getStorageUsageFallbacks,
 } from "./sensor-fields";
 import { loadAllSensorValues } from "./sensor-sources";
@@ -121,6 +122,10 @@ function appendStoragePanelValues(
   }
 
   for (const fallback of getStorageUsageFallbacks(values)) {
+    lines.push(`${fallback.panelKey}: ${fallback.value}`);
+  }
+
+  for (const fallback of getStorageTemperatureFallbacks(values)) {
     lines.push(`${fallback.panelKey}: ${fallback.value}`);
   }
 }

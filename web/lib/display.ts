@@ -1,4 +1,5 @@
 import { access } from "fs/promises";
+import { ensureDisplayDeviceReleased } from "./display-device";
 import { stopPanelMode, startPanelMode } from "./display-panel";
 import { runAsterctl } from "./asterctl-runner";
 import { appendLog } from "./logger";
@@ -62,6 +63,7 @@ export async function applyDisplayMode(
 
   await stopPanelMode();
   await stopTextBannerLive();
+  await ensureDisplayDeviceReleased();
 
   const args = [
     "--device",
@@ -93,7 +95,7 @@ export async function applyDisplayMode(
 
 export async function applyConfig(config: DisplayConfig): Promise<string> {
   if (config.displayMode === "text") {
-    await stopPanelMode();
+    await ensureDisplayDeviceReleased();
     await stopTextBannerLive();
     await appendLog("info", "display", "Generating text banner image");
 

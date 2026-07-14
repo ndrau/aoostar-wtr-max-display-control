@@ -1,5 +1,6 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { runAsterctlWithDeviceLock } from "./display-device";
 import { enqueueDisplayTask } from "./display-queue";
 import { appendLog } from "./logger";
 import { ASTERCTL_PATH } from "./paths";
@@ -27,5 +28,7 @@ async function runAsterctlUnsafe(args: string[]): Promise<string> {
 }
 
 export async function runAsterctl(args: string[]): Promise<string> {
-  return enqueueDisplayTask(() => runAsterctlUnsafe(args));
+  return enqueueDisplayTask(() =>
+    runAsterctlWithDeviceLock(args, runAsterctlUnsafe),
+  );
 }

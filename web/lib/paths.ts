@@ -11,6 +11,7 @@ export const ASTERCTL_PATH =
 export const ASTER_SYSINFO_PATH =
   process.env.ASTER_SYSINFO_PATH || "/usr/local/bin/aster-sysinfo";
 export const CONFIG_DIR = process.env.CONFIG_DIR || "/app/cfg";
+export const FONT_DIR = process.env.FONT_DIR || "/app/fonts";
 export const SENSOR_DIR = path.join(DATA_DIR, "sensors");
 export const SENSOR_MAPPING =
   process.env.SENSOR_MAPPING || "sensor-mapping/truenas-default.cfg";

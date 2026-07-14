@@ -36,7 +36,9 @@ export function SensorsPanel({ refreshToken }: { refreshToken: number }) {
     ["mem_usage_percent", "RAM"],
     ["fan_primary_rpm", "Lüfter 1"],
     ["storage_ssd_0_used", "SSD 1"],
+    ["storage_ssd_0_temperature", "SSD 1 Temp"],
     ["storage_hdd_0_used", "HDD 1"],
+    ["storage_hdd_0_temperature", "HDD 1 Temp"],
   ] as const;
 
   function resolveValue(key: string): string {
@@ -48,6 +50,14 @@ export function SensorsPanel({ refreshToken }: { refreshToken: number }) {
         : undefined) ??
       (key === "storage_hdd_0_used"
         ? values["storage_hdd[0]['used']"]
+        : undefined) ??
+      (key === "storage_ssd_0_temperature"
+        ? values["storage_ssd[0]['temperature']"] ??
+          values["storage_ssd[0]_temperature"]
+        : undefined) ??
+      (key === "storage_hdd_0_temperature"
+        ? values["storage_hdd[0]['temperature']"] ??
+          values["storage_hdd[0]_temperature"]
         : undefined) ??
       "—"
     );
