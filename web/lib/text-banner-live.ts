@@ -23,24 +23,31 @@ function resolveRefreshMs(settings: TextBannerSettings): number {
 let refreshTimer: NodeJS.Timeout | null = null;
 let activeSettings: TextBannerSettings | null = null;
 let sensorCollectorActive = false;
+let refreshInFlight = false;
 
 export function isTextBannerLiveRunning(): boolean {
   return refreshTimer !== null;
 }
 
 async function refreshTextBanner(): Promise<void> {
-  if (!activeSettings) {
+  if (!activeSettings || refreshInFlight) {
     return;
   }
 
-  const snapshot = shouldShowCornerSensors(activeSettings)
-    ? await loadAllSensorValues()
-    : {};
-  const imagePath = await generateTextBannerImage(
-    activeSettings,
-    snapshot,
-  );
-  await runAsterctlDirect(["--device", DEVICE, "--image", imagePath]);
+  refreshInFlight = true;
+
+  try {
+    const snapshot = shouldShowCornerSensors(activeSettings)
+      ? await loadAllSensorValues()
+      : {};
+    const imagePath = await generateTextBannerImage(
+      activeSettings,
+      snapshot,
+    );
+    await runAsterctlDirect(["--device", DEVICE, "--image", imagePath]);
+  } finally {
+    refreshInFlight = false;
+  }
 }
 
 export async function startTextBannerLive(
@@ -88,6 +95,7 @@ export async function stopTextBannerLive(): Promise<void> {
   }
 
   activeSettings = null;
+  refreshInFlight = false;
 
   if (sensorCollectorActive) {
     await releaseSensorCollector("text-banner");
