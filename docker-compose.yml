@@ -1,0 +1,15 @@
+services:
+  aoostar-display:
+    image: ghcr.io/ndrau/aoostar-wtr-max-display:latest
+    container_name: aoostar-display
+    restart: unless-stopped
+    devices:
+      # Stable USB path for AOOSTAR WTR Max (Synwit USB Virtual COM)
+      - /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0
+    environment:
+      DEVICE: /dev/ttyACM0
+      KEEP_ALIVE: "true"
+    # Display off on start (default). Other examples:
+    # command: ["--on"]
+    # command: ["--image", "/data/logo.png"]
+    command: ["--off"]
