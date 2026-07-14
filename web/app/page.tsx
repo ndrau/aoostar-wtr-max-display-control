@@ -10,7 +10,7 @@ import type { DisplayConfig, DisplayMode, TextBannerSettings } from "@/lib/types
 import {
   BANNER_CORNER_LABELS,
   formatCornerLabel,
-  SENSOR_FIELD_OPTIONS,
+  SENSOR_FIELD_GROUPS,
   type BannerCorner,
   type SensorFieldId,
 } from "@/lib/sensor-fields";
@@ -254,10 +254,14 @@ function TextBannerEditor({
                 updateCorner(corner, event.target.value as SensorFieldId)
               }
             >
-              {SENSOR_FIELD_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
+              {SENSOR_FIELD_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -329,8 +333,9 @@ function SensorsPanel({ refreshToken }: { refreshToken: number }) {
     ["cpu_usage_percent", "CPU usage"],
     ["temperature_cpu", "CPU temp"],
     ["mem_usage_percent", "RAM usage"],
-    ["temperature_memory", "RAM temp"],
-    ["temperature_gpu", "GPU temp"],
+    ["fan_primary_rpm", "Fan 1"],
+    ["storage_ssd_0_used", "SSD 1 usage"],
+    ["storage_hdd_0_used", "HDD 1 usage"],
   ] as const;
 
   return (
@@ -363,6 +368,12 @@ function SensorsPanel({ refreshToken }: { refreshToken: number }) {
               const displayValue =
                 values[key] ??
                 (key === "cpu_usage_percent" ? values.cpu_percent : undefined) ??
+                (key === "storage_ssd_0_used"
+                  ? values["storage_ssd[0]['used']"]
+                  : undefined) ??
+                (key === "storage_hdd_0_used"
+                  ? values["storage_hdd[0]['used']"]
+                  : undefined) ??
                 "—";
 
               return (

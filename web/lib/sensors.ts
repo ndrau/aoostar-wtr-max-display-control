@@ -1,5 +1,5 @@
-import { readFile, stat } from "fs/promises";
-import path from "path";
+import { stat } from "fs/promises";
+import { loadAllSensorValues } from "./sensor-sources";
 import { SENSOR_DIR } from "./paths";
 
 export function parseSensorFile(raw: string): Record<string, string> {
@@ -29,16 +29,23 @@ export async function readSensorSnapshot(): Promise<{
   values: Record<string, string>;
   updatedAt: string | null;
 }> {
-  const sensorPath = path.join(SENSOR_DIR, "sysinfo.txt");
+  const sensorPath = `${SENSOR_DIR}/sysinfo.txt`;
 
   try {
-    const raw = await readFile(sensorPath, "utf8");
-    const fileStat = await stat(sensorPath);
+    const values = await loadAllSensorValues();
+    let updatedAt: string | null = null;
+
+    try {
+      const fileStat = await stat(sensorPath);
+      updatedAt = fileStat.mtime.toISOString();
+    } catch {
+      updatedAt = null;
+    }
 
     return {
       path: sensorPath,
-      values: parseSensorFile(raw),
-      updatedAt: fileStat.mtime.toISOString(),
+      values,
+      updatedAt,
     };
   } catch {
     return {

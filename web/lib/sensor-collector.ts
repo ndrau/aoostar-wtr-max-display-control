@@ -49,6 +49,8 @@ async function startSensorCollectorProcess(): Promise<void> {
         SENSOR_DIR,
         "--refresh",
         "3",
+        "--disk-refresh",
+        "60",
       ],
       { stdio: ["ignore", "pipe", "pipe"] },
     );

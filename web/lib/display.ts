@@ -3,7 +3,7 @@ import { stopPanelMode, startPanelMode } from "./display-panel";
 import { runAsterctl } from "./asterctl-runner";
 import { appendLog } from "./logger";
 import { DEVICE, TRUENAS_LOGO_PATH } from "./paths";
-import { readSensorSnapshot } from "./sensors";
+import { loadAllSensorValues } from "./sensor-sources";
 import { generateTextBannerImage } from "./text-banner";
 import {
   startTextBannerLive,
@@ -97,10 +97,10 @@ export async function applyConfig(config: DisplayConfig): Promise<string> {
     await stopTextBannerLive();
     await appendLog("info", "display", "Generating text banner image");
 
-    const snapshot = await readSensorSnapshot();
+    const snapshot = await loadAllSensorValues();
     const imagePath = await generateTextBannerImage(
       config.textBanner,
-      snapshot.values,
+      snapshot,
     );
     await appendLog("info", "display", "Applying display mode: text");
     await runAsterctl(["--device", DEVICE, "--image", imagePath]);

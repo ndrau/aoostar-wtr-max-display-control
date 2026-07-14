@@ -87,7 +87,13 @@ The **Text banner** mode renders your own text as a 960×376 PNG and sends it to
 the display. Pick text color and background color in the web UI, optionally assign
 live system metrics to each corner (top/bottom, left/right), preview the layout,
 then apply settings. Corner values refresh every 3 seconds when at least one
-corner sensor is selected. The generated image is stored at
+corner sensor is selected.
+
+Corner options include **fans (RPM)**, **SSD/HDD usage and temperature**, motherboard
+temperature, network, CPU/RAM/GPU, and uptime. Fan speeds are read from host
+`/sys/class/hwmon` (requires the `/sys` mount). Disk usage bars use `aster-sysinfo
+--disk-refresh` and appear on the system dashboard panel 2.
+ The generated image is stored at
 `/data/uploads/text-banner.png`.
 
 Example corner config in `config.json`:

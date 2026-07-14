@@ -4,7 +4,7 @@ import {
   acquireSensorCollector,
   releaseSensorCollector,
 } from "./sensor-collector";
-import { readSensorSnapshot } from "./sensors";
+import { loadAllSensorValues } from "./sensor-sources";
 import { hasCornerSensors } from "./sensor-fields";
 import { generateTextBannerImage } from "./text-banner";
 import { runAsterctl } from "./asterctl-runner";
@@ -24,10 +24,10 @@ async function refreshTextBanner(): Promise<void> {
     return;
   }
 
-  const snapshot = await readSensorSnapshot();
+  const snapshot = await loadAllSensorValues();
   const imagePath = await generateTextBannerImage(
     activeSettings,
-    snapshot.values,
+    snapshot,
   );
   await runAsterctl(["--device", DEVICE, "--image", imagePath]);
 }
