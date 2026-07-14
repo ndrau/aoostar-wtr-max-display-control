@@ -33,6 +33,27 @@ export function isValidHexColor(value: unknown): value is string {
   return typeof value === "string" && HEX_COLOR_PATTERN.test(value);
 }
 
+function mergeTextBannerCorners(
+  input: Partial<TextBannerCorners> | undefined,
+  fallback: TextBannerCorners = DEFAULT_TEXT_BANNER_CORNERS,
+): TextBannerCorners {
+  const corners: BannerCorner[] = [
+    "topLeft",
+    "topRight",
+    "bottomLeft",
+    "bottomRight",
+  ];
+
+  const result = { ...fallback };
+
+  for (const corner of corners) {
+    const value = input?.[corner] ?? fallback[corner];
+    result[corner] = isSensorFieldId(value) ? value : fallback[corner];
+  }
+
+  return result;
+}
+
 export function validateTextBannerCorners(
   input: Partial<TextBannerCorners> | undefined,
   fallback: TextBannerCorners = DEFAULT_TEXT_BANNER_CORNERS,
@@ -120,7 +141,7 @@ function mergeTextBanner(
     cornerColor: isValidHexColor(raw.cornerColor)
       ? raw.cornerColor.toLowerCase()
       : DEFAULT_TEXT_BANNER.cornerColor,
-    corners: validateTextBannerCorners(raw.corners, DEFAULT_TEXT_BANNER_CORNERS),
+    corners: mergeTextBannerCorners(raw.corners, DEFAULT_TEXT_BANNER_CORNERS),
   };
 }
 

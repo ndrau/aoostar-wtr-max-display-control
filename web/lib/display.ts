@@ -102,9 +102,10 @@ export async function applyConfig(config: DisplayConfig): Promise<string> {
       config.textBanner,
       snapshot.values,
     );
-    const result = await applyDisplayMode("text", null, imagePath);
+    await appendLog("info", "display", "Applying display mode: text");
+    await runAsterctl(["--device", DEVICE, "--image", imagePath]);
     await startTextBannerLive(config.textBanner);
-    return result;
+    return "Text banner applied";
   }
 
   return applyDisplayMode(config.displayMode, config.customImagePath);

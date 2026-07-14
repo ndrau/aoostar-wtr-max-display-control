@@ -359,12 +359,19 @@ function SensorsPanel({ refreshToken }: { refreshToken: number }) {
       {Object.keys(values).length > 0 ? (
         <>
           <div className="sensor-grid">
-            {highlights.map(([key, label]) => (
+            {highlights.map(([key, label]) => {
+              const displayValue =
+                values[key] ??
+                (key === "cpu_usage_percent" ? values.cpu_percent : undefined) ??
+                "—";
+
+              return (
               <div className="sensor-tile" key={key}>
                 <span className="sensor-label">{label}</span>
-                <strong>{values[key] ?? "—"}</strong>
+                <strong>{displayValue}</strong>
               </div>
-            ))}
+              );
+            })}
           </div>
           {updatedAt ? (
             <p className="muted" style={{ marginTop: 12 }}>

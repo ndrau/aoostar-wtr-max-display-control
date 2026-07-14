@@ -90,7 +90,7 @@ async function fileExists(targetPath) {
   }
 }
 
-function resolveArgs(config) {
+async function resolveArgs(config) {
   switch (config.displayMode) {
     case "truenas":
       return ["--image", TRUENAS_LOGO];
@@ -100,7 +100,7 @@ function resolveArgs(config) {
       if (await fileExists(TEXT_BANNER_PATH)) {
         return ["--image", TEXT_BANNER_PATH];
       }
-      return ["--image", TRUENAS_LOGO];
+      return null;
     }
     case "custom": {
       const imagePath = sanitizeCustomImagePath(config.customImagePath);
@@ -134,9 +134,9 @@ async function main() {
     await appendBootLog(
       "warn",
       "boot",
-      "Text banner image missing, falling back to TrueNAS logo until web UI regenerates it",
+      "Text banner image missing, deferring to web UI",
+      `mode: ${config.displayMode}`,
     );
-    config = { ...config, displayMode: "truenas" };
   }
 
   if (config.displayMode === "custom") {
@@ -152,13 +152,13 @@ async function main() {
     }
   }
 
-  const modeArgs = resolveArgs(config);
+  const modeArgs = await resolveArgs(config);
 
   if (!modeArgs) {
     await appendBootLog(
       "info",
       "boot",
-      "Sensor dashboard mode; startup handled by web UI",
+      "Display mode deferred to web UI startup",
       `mode: ${config.displayMode}`,
     );
     return;

@@ -64,9 +64,9 @@ function findNetworkKey(
   values: Record<string, string>,
   suffix: "upload_speed" | "download_speed" | "address0",
 ): string | undefined {
-  const match = Object.keys(values).find((key) =>
-    key.startsWith("network_") && key.endsWith(`_${suffix}`),
-  );
+  const match = Object.keys(values)
+    .filter((key) => key.startsWith("network_") && key.endsWith(`_${suffix}`))
+    .sort()[0];
   return match ? values[match] : undefined;
 }
 
@@ -132,11 +132,13 @@ export function formatSensorFieldValue(
       return formatTemperature(rawValue);
     case "network_primary_upload_speed":
     case "network_primary_download_speed": {
-      const speedKey = Object.keys(values).find((key) =>
-        fieldId === "network_primary_upload_speed"
-          ? key.endsWith("_upload_speed")
-          : key.endsWith("_download_speed"),
-      );
+      const speedKey = Object.keys(values)
+        .filter((key) =>
+          fieldId === "network_primary_upload_speed"
+            ? key.endsWith("_upload_speed")
+            : key.endsWith("_download_speed"),
+        )
+        .sort()[0];
       const speedUnit = speedKey ? values[`${speedKey}#unit`] : undefined;
       return speedUnit ? `${rawValue} ${speedUnit}` : rawValue;
     }

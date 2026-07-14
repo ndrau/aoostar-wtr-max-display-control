@@ -5,12 +5,11 @@ import {
   releaseSensorCollector,
 } from "./sensor-collector";
 import {
-  ASTERCTL_PATH,
-  CONFIG_DIR,
-  DEVICE,
-  SENSOR_DIR,
-  SENSOR_MAPPING,
-} from "./paths";
+  startPanelSensorMapper,
+  stopPanelSensorMapper,
+  writePanelSensorFile,
+} from "./sensor-panel-mapper";
+import { ASTERCTL_PATH, CONFIG_DIR, DEVICE, SENSOR_DIR } from "./paths";
 
 let panelProcess: ChildProcess | null = null;
 let panelRunning = false;
@@ -46,8 +45,9 @@ export function isPanelModeRunning(): boolean {
 }
 
 export async function stopPanelMode(): Promise<void> {
+  stopPanelSensorMapper();
+
   if (!panelRunning && !panelProcess) {
-    await releaseSensorCollector("panel");
     return;
   }
 
@@ -64,6 +64,8 @@ export async function startPanelMode(): Promise<string> {
   }
 
   await acquireSensorCollector("panel");
+  startPanelSensorMapper();
+  await writePanelSensorFile();
 
   const args = [
     "--device",
@@ -74,8 +76,6 @@ export async function startPanelMode(): Promise<string> {
     CONFIG_DIR,
     "--sensor-path",
     SENSOR_DIR,
-    "--sensor-mapping",
-    SENSOR_MAPPING,
   ];
 
   await appendLog(
@@ -105,6 +105,7 @@ export async function startPanelMode(): Promise<string> {
         `code=${code ?? "null"}, signal=${signal ?? "null"}`,
       );
       panelRunning = false;
+      stopPanelSensorMapper();
     }
     panelProcess = null;
   });

@@ -2,7 +2,7 @@ import { readFile, stat } from "fs/promises";
 import path from "path";
 import { SENSOR_DIR } from "./paths";
 
-function parseSensorFile(raw: string): Record<string, string> {
+export function parseSensorFile(raw: string): Record<string, string> {
   const values: Record<string, string> = {};
 
   for (const line of raw.split("\n")) {

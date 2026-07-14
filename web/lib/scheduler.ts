@@ -43,6 +43,15 @@ export async function runScheduledCheck(): Promise<void> {
   const config = await readConfig();
 
   if (!config.schedule.enabled) {
+    if (lastAppliedState === "off-window") {
+      await appendLog(
+        "info",
+        "scheduler",
+        "Timer disabled, restoring configured display mode",
+        config.displayMode,
+      );
+      await applyConfig(config);
+    }
     lastAppliedState = null;
     return;
   }
