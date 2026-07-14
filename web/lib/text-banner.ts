@@ -7,11 +7,19 @@ import {
 } from "./sensor-fields";
 import { TEXT_BANNER_PATH, UPLOAD_DIR } from "./paths";
 import { formatBannerClock } from "./format";
+import {
+  BANNER_CLOCK_FONT_SIZE,
+  BANNER_CLOCK_Y,
+  BANNER_CORNER_FONT_SIZE,
+  BANNER_CORNER_PADDING_X,
+  BANNER_CORNER_PADDING_Y,
+  DISPLAY_HEIGHT,
+  DISPLAY_WIDTH,
+} from "./display-dimensions";
 import { resolveBannerFontSize } from "./text-banner-font";
 import type { TextBannerSettings } from "./types";
 
-export const DISPLAY_WIDTH = 960;
-export const DISPLAY_HEIGHT = 376;
+export { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "./display-dimensions";
 const MAX_TEXT_LENGTH = 80;
 
 export {
@@ -21,11 +29,11 @@ export {
 } from "./text-banner-font";
 
 const FONT_FAMILY = "DejaVu Sans, Liberation Sans, sans-serif";
-const CORNER_FONT_SIZE = 22;
-const CLOCK_FONT_SIZE = 22;
-const CLOCK_Y = 32;
-const CORNER_PADDING_X = 20;
-const CORNER_PADDING_Y = 28;
+const CORNER_FONT_SIZE = BANNER_CORNER_FONT_SIZE;
+const CLOCK_FONT_SIZE = BANNER_CLOCK_FONT_SIZE;
+const CLOCK_Y = BANNER_CLOCK_Y;
+const CORNER_PADDING_X = BANNER_CORNER_PADDING_X;
+const CORNER_PADDING_Y = BANNER_CORNER_PADDING_Y;
 
 const CORNER_LAYOUT: Record<
   BannerCorner,

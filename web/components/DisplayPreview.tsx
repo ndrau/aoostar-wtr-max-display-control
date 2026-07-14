@@ -5,6 +5,12 @@ import { formatCornerLabel } from "@/lib/sensor-fields";
 import { getModeMeta } from "@/lib/mode-meta";
 import { formatBannerClock } from "@/lib/format";
 import { resolveBannerFontSize } from "@/lib/text-banner-font";
+import {
+  BANNER_CLOCK_FONT_SIZE,
+  BANNER_CORNER_FONT_SIZE,
+  DISPLAY_HEIGHT,
+  DISPLAY_WIDTH,
+} from "@/lib/display-dimensions";
 import type { DisplayConfig } from "@/lib/types";
 
 export function DisplayPreview({
@@ -49,7 +55,10 @@ export function DisplayPreview({
           style={{
             backgroundColor: config.textBanner.backgroundColor,
             color: config.textBanner.textColor,
-            containerType: "inline-size",
+            ["--banner-w" as string]: DISPLAY_WIDTH,
+            ["--banner-h" as string]: DISPLAY_HEIGHT,
+            ["--corner-font" as string]: BANNER_CORNER_FONT_SIZE,
+            ["--clock-font" as string]: BANNER_CLOCK_FONT_SIZE,
           }}
         >
           {config.textBanner.showClock ? (
@@ -82,7 +91,7 @@ export function DisplayPreview({
           <span
             className="text-banner-center"
             style={{
-              fontSize: `calc(${bannerFontSize} / ${960} * 100cqw)`,
+              fontSize: `calc(${bannerFontSize} / var(--banner-w) * 100cqw)`,
             }}
           >
             {config.textBanner.text.trim() || "Vorschau"}
