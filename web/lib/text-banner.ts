@@ -86,6 +86,10 @@ function buildCornerElements(
   settings: TextBannerSettings,
   sensorValues: Record<string, string>,
 ): string {
+  if (!settings.showCornerSensors) {
+    return "";
+  }
+
   return (Object.keys(CORNER_LAYOUT) as BannerCorner[])
     .map((corner) => {
       const fieldId = settings.corners[corner];

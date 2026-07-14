@@ -35,6 +35,10 @@ export function mergeConfig(parsed: Partial<DisplayConfig>): DisplayConfig {
     textBanner: {
       ...DEFAULT_TEXT_BANNER,
       ...parsed.textBanner,
+      showCornerSensors:
+        typeof parsed.textBanner?.showCornerSensors === "boolean"
+          ? parsed.textBanner.showCornerSensors
+          : DEFAULT_TEXT_BANNER.showCornerSensors,
       corners: {
         ...DEFAULT_TEXT_BANNER.corners,
         ...parsed.textBanner?.corners,

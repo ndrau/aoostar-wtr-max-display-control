@@ -5,7 +5,7 @@ import {
   releaseSensorCollector,
 } from "./sensor-collector";
 import { loadAllSensorValues } from "./sensor-sources";
-import { hasCornerSensors } from "./sensor-fields";
+import { shouldShowCornerSensors } from "./sensor-fields";
 import { generateTextBannerImage } from "./text-banner";
 import { runAsterctlDirect } from "./asterctl-runner";
 import type { TextBannerSettings } from "./types";
@@ -37,7 +37,7 @@ export async function startTextBannerLive(
 ): Promise<void> {
   await stopTextBannerLive();
 
-  if (!hasCornerSensors(settings.corners)) {
+  if (!shouldShowCornerSensors(settings)) {
     return;
   }
 

@@ -378,6 +378,13 @@ export function hasCornerSensors(corners: TextBannerCorners): boolean {
   return Object.values(corners).some((fieldId) => fieldId !== "none");
 }
 
+export function shouldShowCornerSensors(settings: {
+  showCornerSensors: boolean;
+  corners: TextBannerCorners;
+}): boolean {
+  return settings.showCornerSensors && hasCornerSensors(settings.corners);
+}
+
 export const DEFAULT_TEXT_BANNER_CORNERS: TextBannerCorners = {
   topLeft: "none",
   topRight: "none",

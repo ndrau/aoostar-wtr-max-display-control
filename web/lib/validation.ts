@@ -109,6 +109,7 @@ export function validateTextBanner(
     textColor: textColor.toLowerCase(),
     backgroundColor: backgroundColor.toLowerCase(),
     cornerColor: cornerColor.toLowerCase(),
+    showCornerSensors: input?.showCornerSensors ?? fallback.showCornerSensors,
     corners: validateTextBannerCorners(input?.corners, fallback.corners),
   };
 }
@@ -141,6 +142,10 @@ function mergeTextBanner(
     cornerColor: isValidHexColor(raw.cornerColor)
       ? raw.cornerColor.toLowerCase()
       : DEFAULT_TEXT_BANNER.cornerColor,
+    showCornerSensors:
+      typeof raw.showCornerSensors === "boolean"
+        ? raw.showCornerSensors
+        : DEFAULT_TEXT_BANNER.showCornerSensors,
     corners: mergeTextBannerCorners(raw.corners, DEFAULT_TEXT_BANNER_CORNERS),
   };
 }

@@ -36,23 +36,25 @@ export function DisplayPreview({
             color: config.textBanner.textColor,
           }}
         >
-          {corners.map(([className, corner]) => {
-            const label = formatCornerLabel(
-              config.textBanner.corners[corner],
-              sensorValues,
-            );
-            if (!label) return null;
+          {config.textBanner.showCornerSensors
+            ? corners.map(([className, corner]) => {
+                const label = formatCornerLabel(
+                  config.textBanner.corners[corner],
+                  sensorValues,
+                );
+                if (!label) return null;
 
-            return (
-              <span
-                key={corner}
-                className={`text-banner-corner ${className}`}
-                style={{ color: config.textBanner.cornerColor }}
-              >
-                {label}
-              </span>
-            );
-          })}
+                return (
+                  <span
+                    key={corner}
+                    className={`text-banner-corner ${className}`}
+                    style={{ color: config.textBanner.cornerColor }}
+                  >
+                    {label}
+                  </span>
+                );
+              })
+            : null}
           <span className="text-banner-center">
             {config.textBanner.text.trim() || "Vorschau"}
           </span>

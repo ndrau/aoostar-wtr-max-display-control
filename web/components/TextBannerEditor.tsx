@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   BANNER_CORNER_LABELS,
   SENSOR_FIELD_GROUPS,
@@ -45,10 +44,6 @@ export function TextBannerEditor({
   textBanner: TextBannerSettings;
   onChange: (next: TextBannerSettings) => void;
 }) {
-  const [showCorners, setShowCorners] = useState(
-    Object.values(textBanner.corners).some((value) => value !== "none"),
-  );
-
   function updateColor(
     key: "textColor" | "backgroundColor" | "cornerColor",
     value: string,
@@ -84,6 +79,26 @@ export function TextBannerEditor({
         <span className="field-hint">{textBanner.text.length}/80 Zeichen</span>
       </div>
 
+      <label className="switch-row">
+        <input
+          type="checkbox"
+          checked={textBanner.showCornerSensors}
+          onChange={(event) =>
+            onChange({
+              ...textBanner,
+              showCornerSensors: event.target.checked,
+            })
+          }
+        />
+        <span>
+          <strong>Live-Daten in Ecken</strong>
+          <small>
+            Aus: nur Schriftzug. An: Sensorwerte in den vier Ecken zusätzlich
+            zum Text.
+          </small>
+        </span>
+      </label>
+
       <div className="preset-row">
         {COLOR_PRESETS.map((preset) => (
           <button
@@ -108,7 +123,7 @@ export function TextBannerEditor({
         ))}
       </div>
 
-      <div className="color-grid">
+      <div className={`color-grid ${textBanner.showCornerSensors ? "color-grid-3" : "color-grid-2"}`}>
         <ColorField
           id="banner-text-color"
           label="Textfarbe"
@@ -125,25 +140,19 @@ export function TextBannerEditor({
             updateColor("backgroundColor", value, textBanner.backgroundColor)
           }
         />
-        <ColorField
-          id="banner-corner-color"
-          label="Ecken"
-          value={textBanner.cornerColor}
-          onChange={(value) =>
-            updateColor("cornerColor", value, textBanner.cornerColor)
-          }
-        />
+        {textBanner.showCornerSensors ? (
+          <ColorField
+            id="banner-corner-color"
+            label="Eckenfarbe"
+            value={textBanner.cornerColor}
+            onChange={(value) =>
+              updateColor("cornerColor", value, textBanner.cornerColor)
+            }
+          />
+        ) : null}
       </div>
 
-      <button
-        type="button"
-        className="inline-toggle"
-        onClick={() => setShowCorners((value) => !value)}
-      >
-        {showCorners ? "Ecken-Sensoren ausblenden" : "Live-Daten in Ecken anzeigen"}
-      </button>
-
-      {showCorners ? (
+      {textBanner.showCornerSensors ? (
         <div className="corner-grid">
           {(Object.keys(BANNER_CORNER_LABELS) as BannerCorner[]).map((corner) => (
             <div className="field" key={corner}>
@@ -174,7 +183,12 @@ export function TextBannerEditor({
             read-only Mount von <code>/sys</code>.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <p className="hint">
+          Nur der Schriftzug wird angezeigt — keine Sensor-Aktualisierung im
+          Hintergrund.
+        </p>
+      )}
     </div>
   );
 }
