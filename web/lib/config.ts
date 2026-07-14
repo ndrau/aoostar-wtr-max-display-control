@@ -1,16 +1,37 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { CONFIG_PATH, DATA_DIR, UPLOAD_DIR } from "./paths";
-import { DEFAULT_CONFIG, type DisplayConfig } from "./types";
+import { DEFAULT_CONFIG, DEFAULT_TEXT_BANNER, type DisplayConfig, type DisplayMode } from "./types";
 
 async function ensureDataDir() {
   await mkdir(DATA_DIR, { recursive: true });
   await mkdir(UPLOAD_DIR, { recursive: true });
 }
 
+function normalizeDisplayMode(
+  value: Partial<DisplayConfig>["displayMode"],
+): DisplayMode | undefined {
+  if (value === "original") {
+    return "sensors";
+  }
+
+  return value;
+}
+
 export function mergeConfig(parsed: Partial<DisplayConfig>): DisplayConfig {
+  const displayMode = normalizeDisplayMode(parsed.displayMode);
+
   return {
     ...DEFAULT_CONFIG,
     ...parsed,
+    ...(displayMode ? { displayMode } : {}),
+    textBanner: {
+      ...DEFAULT_TEXT_BANNER,
+      ...parsed.textBanner,
+      corners: {
+        ...DEFAULT_TEXT_BANNER.corners,
+        ...parsed.textBanner?.corners,
+      },
+    },
     schedule: {
       ...DEFAULT_CONFIG.schedule,
       ...parsed.schedule,

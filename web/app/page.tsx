@@ -6,7 +6,14 @@ import {
   getStoredApiToken,
   storeApiToken,
 } from "@/lib/client-auth";
-import type { DisplayConfig, DisplayMode } from "@/lib/types";
+import type { DisplayConfig, DisplayMode, TextBannerSettings } from "@/lib/types";
+import {
+  BANNER_CORNER_LABELS,
+  formatCornerLabel,
+  SENSOR_FIELD_OPTIONS,
+  type BannerCorner,
+  type SensorFieldId,
+} from "@/lib/sensor-fields";
 
 interface LogEntry {
   ts: string;
@@ -20,31 +27,354 @@ const MODE_OPTIONS: Array<{
   value: DisplayMode;
   title: string;
   description: string;
+  hint?: string;
 }> = [
   {
     value: "truenas",
     title: "TrueNAS SCALE Logo",
-    description: "Default splash screen on startup.",
+    description: "Static splash screen — shown on every container start by default.",
   },
   {
-    value: "original",
-    title: "Original",
-    description: "Show the last AOOSTAR firmware image.",
+    value: "sensors",
+    title: "System dashboard (live)",
+    description:
+      "AOOSTAR-style panels with CPU, RAM, GPU, network, and disk values.",
+    hint: "Requires host /proc and /sys mounts (see README). Updates every few seconds.",
+  },
+  {
+    value: "text",
+    title: "Text banner",
+    description:
+      "Custom text with colors plus optional live system data in each corner (960×376).",
   },
   {
     value: "custom",
     title: "Custom image",
-    description: "Use an uploaded PNG/JPG (960×376 recommended).",
+    description: "Static PNG/JPG you upload (960×376 recommended).",
   },
   {
     value: "off",
     title: "Display off",
-    description: "Turn the embedded LCD off.",
+    description: "Turn the embedded LCD off completely.",
   },
 ];
 
 function formatTime(value: string) {
   return new Date(value).toLocaleString();
+}
+
+function normalizeHexColor(value: string, fallback: string): string {
+  const trimmed = value.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
+}
+
+function TextBannerEditor({
+  textBanner,
+  active,
+  onChange,
+}: {
+  textBanner: TextBannerSettings;
+  active: boolean;
+  onChange: (next: TextBannerSettings) => void;
+}) {
+  const [sensorValues, setSensorValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSensors() {
+      try {
+        const response = await apiFetch("/api/sensors");
+        const data = await response.json();
+        if (!cancelled && data.ok) {
+          setSensorValues(data.values ?? {});
+        }
+      } catch {
+        // Preview works without live sensor data.
+      }
+    }
+
+    loadSensors();
+    const interval = window.setInterval(loadSensors, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  function updateColor(
+    key: "textColor" | "backgroundColor" | "cornerColor",
+    value: string,
+    fallback: string,
+  ) {
+    onChange({
+      ...textBanner,
+      [key]: normalizeHexColor(value, fallback),
+    });
+  }
+
+  function updateCorner(corner: BannerCorner, value: SensorFieldId) {
+    onChange({
+      ...textBanner,
+      corners: {
+        ...textBanner.corners,
+        [corner]: value,
+      },
+    });
+  }
+
+  const cornerPositions: Record<BannerCorner, string> = {
+    topLeft: "corner-top-left",
+    topRight: "corner-top-right",
+    bottomLeft: "corner-bottom-left",
+    bottomRight: "corner-bottom-right",
+  };
+
+  return (
+    <div className={`card ${active ? "card-active" : ""}`}>
+      <h2>Text banner</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Create a display image from text. Optionally place live system data in
+        any corner. Select the &quot;Text banner&quot; mode above, then apply
+        settings.
+      </p>
+
+      <div className="field">
+        <label htmlFor="banner-text">Center text</label>
+        <textarea
+          id="banner-text"
+          rows={3}
+          maxLength={80}
+          value={textBanner.text}
+          onChange={(event) =>
+            onChange({ ...textBanner, text: event.target.value })
+          }
+          placeholder="e.g. TrueNAS SCALE"
+        />
+      </div>
+
+      <div className="row" style={{ marginTop: 14 }}>
+        <div className="field">
+          <label htmlFor="banner-text-color">Text color</label>
+          <div className="color-input">
+            <input
+              id="banner-text-color"
+              type="color"
+              value={textBanner.textColor}
+              onChange={(event) =>
+                updateColor("textColor", event.target.value, textBanner.textColor)
+              }
+            />
+            <input
+              type="text"
+              value={textBanner.textColor}
+              onChange={(event) =>
+                updateColor("textColor", event.target.value, textBanner.textColor)
+              }
+              spellCheck={false}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="banner-bg-color">Background color</label>
+          <div className="color-input">
+            <input
+              id="banner-bg-color"
+              type="color"
+              value={textBanner.backgroundColor}
+              onChange={(event) =>
+                updateColor(
+                  "backgroundColor",
+                  event.target.value,
+                  textBanner.backgroundColor,
+                )
+              }
+            />
+            <input
+              type="text"
+              value={textBanner.backgroundColor}
+              onChange={(event) =>
+                updateColor(
+                  "backgroundColor",
+                  event.target.value,
+                  textBanner.backgroundColor,
+                )
+              }
+              spellCheck={false}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="banner-corner-color">Corner data color</label>
+          <div className="color-input">
+            <input
+              id="banner-corner-color"
+              type="color"
+              value={textBanner.cornerColor}
+              onChange={(event) =>
+                updateColor(
+                  "cornerColor",
+                  event.target.value,
+                  textBanner.cornerColor,
+                )
+              }
+            />
+            <input
+              type="text"
+              value={textBanner.cornerColor}
+              onChange={(event) =>
+                updateColor(
+                  "cornerColor",
+                  event.target.value,
+                  textBanner.cornerColor,
+                )
+              }
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      </div>
+
+      <h3 className="section-title">Corner system data</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Choose which metric appears in each corner. Live values need host
+        /proc and /sys mounts.
+      </p>
+      <div className="corner-grid">
+        {(Object.keys(BANNER_CORNER_LABELS) as BannerCorner[]).map((corner) => (
+          <div className="field" key={corner}>
+            <label htmlFor={`corner-${corner}`}>{BANNER_CORNER_LABELS[corner]}</label>
+            <select
+              id={`corner-${corner}`}
+              value={textBanner.corners[corner]}
+              onChange={(event) =>
+                updateCorner(corner, event.target.value as SensorFieldId)
+              }
+            >
+              {SENSOR_FIELD_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="text-banner-preview"
+        style={{
+          backgroundColor: textBanner.backgroundColor,
+          color: textBanner.textColor,
+        }}
+      >
+        {(Object.keys(cornerPositions) as BannerCorner[]).map((corner) => {
+          const label = formatCornerLabel(textBanner.corners[corner], sensorValues);
+          if (!label) {
+            return null;
+          }
+
+          return (
+            <span
+              key={corner}
+              className={`text-banner-corner ${cornerPositions[corner]}`}
+              style={{ color: textBanner.cornerColor }}
+            >
+              {label}
+            </span>
+          );
+        })}
+        <span className="text-banner-center">
+          {textBanner.text.trim() || "Preview"}
+        </span>
+      </div>
+      <p className="muted" style={{ marginTop: 10 }}>
+        Preview approximates the 960×376 case display. Corner values refresh
+        every few seconds when sensors are available.
+      </p>
+    </div>
+  );
+}
+
+function SensorsPanel({ refreshToken }: { refreshToken: number }) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [panelRunning, setPanelRunning] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSensors = useCallback(async () => {
+    try {
+      const response = await apiFetch("/api/sensors");
+      const data = await response.json();
+      if (data.ok) {
+        setValues(data.values ?? {});
+        setPanelRunning(Boolean(data.panelRunning));
+        setUpdatedAt(data.updatedAt ?? null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSensors();
+    const interval = window.setInterval(fetchSensors, 4000);
+    return () => window.clearInterval(interval);
+  }, [fetchSensors, refreshToken]);
+
+  const highlights = [
+    ["cpu_usage_percent", "CPU usage"],
+    ["temperature_cpu", "CPU temp"],
+    ["mem_usage_percent", "RAM usage"],
+    ["temperature_memory", "RAM temp"],
+    ["temperature_gpu", "GPU temp"],
+  ] as const;
+
+  return (
+    <section className="card">
+      <div className="logs-header">
+        <h2>Live sensor data</h2>
+        <span className={`badge ${panelRunning ? "badge-on" : "badge-off"}`}>
+          {panelRunning ? "Dashboard running" : "Dashboard stopped"}
+        </span>
+      </div>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Values written to the case display when &quot;System dashboard&quot; is
+        active. Network and disk fields may need a custom sensor mapping on
+        TrueNAS.
+      </p>
+
+      {loading ? <p className="muted">Loading sensor snapshot…</p> : null}
+
+      {!loading && Object.keys(values).length === 0 ? (
+        <p className="muted">
+          No sensor file yet. Apply &quot;System dashboard (live)&quot; and wait
+          a few seconds.
+        </p>
+      ) : null}
+
+      {Object.keys(values).length > 0 ? (
+        <>
+          <div className="sensor-grid">
+            {highlights.map(([key, label]) => (
+              <div className="sensor-tile" key={key}>
+                <span className="sensor-label">{label}</span>
+                <strong>{values[key] ?? "—"}</strong>
+              </div>
+            ))}
+          </div>
+          {updatedAt ? (
+            <p className="muted" style={{ marginTop: 12 }}>
+              Last update: {formatTime(updatedAt)}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
 }
 
 function LogsPanel({
@@ -219,7 +549,7 @@ export default function Dashboard() {
     }
   }
 
-  async function quickAction(action: "on" | "off" | "original") {
+  async function quickAction(action: "on" | "off" | "sensors") {
     setStatus(`Running ${action}…`);
     setError(false);
 
@@ -327,8 +657,8 @@ export default function Dashboard() {
         <div className="eyebrow">AOOSTAR WTR Max</div>
         <h1>Display Control</h1>
         <p>
-          Configure the embedded case display: TrueNAS logo, original AOOSTAR
-          screen, custom image, timer, or off.
+          Control the embedded case display: TrueNAS logo, live system
+          dashboard, text banner, custom image, timer, or off.
         </p>
       </header>
 
@@ -351,6 +681,7 @@ export default function Dashboard() {
                 <div>
                   <strong>{option.title}</strong>
                   <span>{option.description}</span>
+                  {option.hint ? <span className="option-hint">{option.hint}</span> : null}
                 </div>
               </label>
             ))}
@@ -379,9 +710,9 @@ export default function Dashboard() {
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => quickAction("original")}
+                onClick={() => quickAction("sensors")}
               >
-                Original on
+                Start system dashboard
               </button>
               <button
                 className="btn btn-danger"
@@ -391,6 +722,12 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+
+          <TextBannerEditor
+            active={config.displayMode === "text"}
+            textBanner={config.textBanner}
+            onChange={(textBanner) => setConfig({ ...config, textBanner })}
+          />
 
           <div className="card">
             <h2>Custom upload</h2>
@@ -475,6 +812,8 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      <SensorsPanel refreshToken={logRefreshToken} />
 
       <LogsPanel
         refreshToken={logRefreshToken}

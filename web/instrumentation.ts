@@ -2,6 +2,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { appendLog } = await import("./lib/logger");
     const { startScheduler } = await import("./lib/scheduler");
+    const { syncDisplayFromConfig } = await import("./lib/display-sync");
 
     if (!process.env.API_TOKEN?.trim()) {
       await appendLog(
@@ -15,5 +16,6 @@ export async function register() {
 
     await appendLog("info", "system", "Web UI started");
     startScheduler();
+    await syncDisplayFromConfig();
   }
 }

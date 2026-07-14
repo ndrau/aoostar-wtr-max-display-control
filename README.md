@@ -8,7 +8,7 @@ Uses [`asterctl`](https://github.com/zehnm/aoostar-rs) under the hood. The displ
 
 - **Default startup:** TrueNAS SCALE splash screen on the case display
 - **Web UI (Next.js):** configure display mode, upload logos, quick on/off, daily timer
-- **Modes:** TrueNAS logo · Original AOOSTAR image · Custom upload · Off
+- **Modes:** TrueNAS logo · Live system dashboard · Text banner · Custom upload · Off
 - **Secure container:** only the serial device is passed through — no `privileged` mode
 
 Published image:
@@ -44,13 +44,69 @@ Example from AOOSTAR WTR Max:
 
 | Section | What it does |
 |---|---|
-| Display mode | TrueNAS logo, original firmware image, custom upload, or off |
-| Quick actions | Instantly show logo, restore original, or turn display off |
+| Display mode | TrueNAS logo, live dashboard, text banner, custom upload, or off |
+| Quick actions | Instantly show logo, start dashboard, or turn display off |
 | Custom upload | Upload PNG/JPG (960×376 recommended) |
 | Timer | Daily on/off schedule |
 | Activity log | Live log of boot, asterctl commands, scheduler, uploads, and errors |
+| Live sensor data | Preview of values sent to the case display in dashboard mode |
 
 Settings are stored in the mounted volume at `/data/config.json`. Logs are stored at `/data/logs/display.log`.
+
+## Live system dashboard
+
+The **System dashboard (live)** mode renders the original AOOSTAR-style panels using
+[`asterctl --config`](https://zehnm.github.io/aoostar-rs/sensor/panel.html) and
+[`aster-sysinfo`](https://zehnm.github.io/aoostar-rs/sensor/provider/sysinfo.html).
+
+1. Select **System dashboard (live)** in the web UI and click **Apply settings**
+2. The container starts `aster-sysinfo` (collects host metrics every 3s) and
+   `asterctl` in panel mode (renders them on the LCD)
+3. The web UI shows a live preview of the same sensor file
+
+### Required compose mounts
+
+Without host `/proc` and `/sys`, the dashboard would only show container stats.
+Add read-only host mounts:
+
+```yaml
+volumes:
+  - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
+  - /proc:/proc:ro
+  - /sys:/sys:ro
+```
+
+Network speed, IP, and per-disk temperatures need interface-specific entries in
+the sensor mapping file. The default mapping ships CPU/RAM/GPU fields; extend
+`/app/cfg/sensor-mapping/truenas-default.cfg` or set `SENSOR_MAPPING` if your
+NIC or pool layout needs custom labels.
+
+## Text banner
+
+The **Text banner** mode renders your own text as a 960×376 PNG and sends it to
+the display. Pick text color and background color in the web UI, optionally assign
+live system metrics to each corner (top/bottom, left/right), preview the layout,
+then apply settings. Corner values refresh every 3 seconds when at least one
+corner sensor is selected. The generated image is stored at
+`/data/uploads/text-banner.png`.
+
+Example corner config in `config.json`:
+
+```json
+"textBanner": {
+  "text": "AndyNAS",
+  "textColor": "#e8eef8",
+  "backgroundColor": "#0b1220",
+  "cornerColor": "#9aa8c2",
+  "corners": {
+    "topLeft": "cpu_usage_percent",
+    "topRight": "temperature_cpu",
+    "bottomLeft": "mem_usage_percent",
+    "bottomRight": "network_primary_address"
+  }
+}
+```
+
 
 Set `API_TOKEN` in the container environment before exposing the UI on your network.
 
@@ -78,6 +134,8 @@ services:
       - /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00:/dev/ttyACM0
     volumes:
       - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
+      - /proc:/proc:ro
+      - /sys:/sys:ro
     environment:
       API_TOKEN: change-me-to-a-long-random-token
       TZ: Europe/Berlin
@@ -93,6 +151,8 @@ services:
 | `API_TOKEN` | unset | Protects all `/api/*` routes when set |
 | `TZ` | UTC | Scheduler timezone, e.g. `Europe/Berlin` |
 | `TRUENAS_LOGO_PATH` | `/app/assets/truenas-scale.png` | Built-in splash image |
+| `SENSOR_MAPPING` | `sensor-mapping/truenas-default.cfg` | Maps aster-sysinfo keys to AOOSTAR panel labels |
+| `CONFIG_DIR` | `/app/cfg` | asterctl configuration directory |
 
 ## Security
 
@@ -110,7 +170,8 @@ services:
 This container is intentionally narrow in scope:
 
 - It does **not** modify TrueNAS system files, pools, datasets, or services
-- It does **not** require host networking or additional host mounts
+- It does **not** require host networking
+- For live sensors it mounts host `/proc` and `/sys` read-only (no `privileged`)
 - It only talks to the AOOSTAR case display over USB serial
 - Persistent files are limited to `/data` on your chosen dataset
 

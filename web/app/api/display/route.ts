@@ -10,10 +10,10 @@ export async function POST(request: Request) {
   if (authError) return authError;
 
   try {
-    const body = (await request.json()) as { action?: "on" | "off" | "original" };
+    const body = (await request.json()) as { action?: "on" | "off" | "sensors" };
     const action = body.action;
 
-    if (!action || !["on", "off", "original"].includes(action)) {
+    if (!action || !["on", "off", "sensors"].includes(action)) {
       return NextResponse.json(
         { ok: false, error: "Invalid action" },
         { status: 400 },

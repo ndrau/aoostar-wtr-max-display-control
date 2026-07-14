@@ -16,17 +16,49 @@ const TRUENAS_LOGO = process.env.TRUENAS_LOGO_PATH || "/app/assets/truenas-scale
 const DEFAULT_CONFIG = {
   displayMode: "truenas",
   customImagePath: null,
+  textBanner: {
+    text: "TrueNAS SCALE",
+    textColor: "#e8eef8",
+    backgroundColor: "#0b1220",
+    cornerColor: "#9aa8c2",
+    corners: {
+      topLeft: "none",
+      topRight: "none",
+      bottomLeft: "none",
+      bottomRight: "none",
+    },
+  },
   schedule: {
     enabled: false,
     displayOnTime: "08:00",
     displayOffTime: "22:00",
   },
 };
+const TEXT_BANNER_PATH = path.join(UPLOAD_DIR, "text-banner.png");
+
+function normalizeDisplayMode(value) {
+  if (value === "original") {
+    return "sensors";
+  }
+
+  return value;
+}
 
 function mergeConfig(parsed) {
+  const displayMode = normalizeDisplayMode(parsed?.displayMode);
+
   return {
     ...DEFAULT_CONFIG,
     ...parsed,
+    ...(displayMode ? { displayMode } : {}),
+    textBanner: {
+      ...DEFAULT_CONFIG.textBanner,
+      ...parsed?.textBanner,
+      corners: {
+        ...DEFAULT_CONFIG.textBanner.corners,
+        ...parsed?.textBanner?.corners,
+      },
+    },
     schedule: {
       ...DEFAULT_CONFIG.schedule,
       ...parsed?.schedule,
@@ -62,8 +94,14 @@ function resolveArgs(config) {
   switch (config.displayMode) {
     case "truenas":
       return ["--image", TRUENAS_LOGO];
-    case "original":
-      return ["--on"];
+    case "sensors":
+      return null;
+    case "text": {
+      if (await fileExists(TEXT_BANNER_PATH)) {
+        return ["--image", TEXT_BANNER_PATH];
+      }
+      return ["--image", TRUENAS_LOGO];
+    }
     case "custom": {
       const imagePath = sanitizeCustomImagePath(config.customImagePath);
       if (!imagePath) {
@@ -92,6 +130,15 @@ async function main() {
     await appendBootLog("info", "boot", "Created default config", CONFIG_PATH);
   }
 
+  if (config.displayMode === "text" && !(await fileExists(TEXT_BANNER_PATH))) {
+    await appendBootLog(
+      "warn",
+      "boot",
+      "Text banner image missing, falling back to TrueNAS logo until web UI regenerates it",
+    );
+    config = { ...config, displayMode: "truenas" };
+  }
+
   if (config.displayMode === "custom") {
     const imagePath = sanitizeCustomImagePath(config.customImagePath);
     if (!imagePath || !(await fileExists(imagePath))) {
@@ -105,7 +152,19 @@ async function main() {
     }
   }
 
-  const args = ["--device", DEVICE, ...resolveArgs(config)];
+  const modeArgs = resolveArgs(config);
+
+  if (!modeArgs) {
+    await appendBootLog(
+      "info",
+      "boot",
+      "Sensor dashboard mode; startup handled by web UI",
+      `mode: ${config.displayMode}`,
+    );
+    return;
+  }
+
+  const args = ["--device", DEVICE, ...modeArgs];
   const command = `${ASTERCTL} ${args.join(" ")}`;
 
   await appendBootLog("info", "boot", "Running startup command", command);

@@ -16,3 +16,6 @@ services:
       API_TOKEN: change-me-to-a-long-random-token
     volumes:
       - /mnt/AndysFastStorage/docker/aoostar-wtr-max-display-control:/data
+      # Host stats for live sensor dashboard (read-only, no privileged mode)
+      - /proc:/proc:ro
+      - /sys:/sys:ro

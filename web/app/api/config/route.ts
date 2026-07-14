@@ -26,6 +26,14 @@ export async function PUT(request: Request) {
     const merged = mergeConfig({
       ...current,
       ...body,
+      textBanner: {
+        ...current.textBanner,
+        ...body.textBanner,
+        corners: {
+          ...current.textBanner.corners,
+          ...body.textBanner?.corners,
+        },
+      },
       schedule: { ...current.schedule, ...body.schedule },
     });
     const nextConfig = validateConfig(merged);

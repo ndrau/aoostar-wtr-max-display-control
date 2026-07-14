@@ -1,9 +1,23 @@
 import path from "path";
-import type { DisplayConfig, DisplayMode } from "./types";
+import type { DisplayConfig, DisplayMode, TextBannerSettings } from "./types";
+import { DEFAULT_TEXT_BANNER } from "./types";
+import {
+  DEFAULT_TEXT_BANNER_CORNERS,
+  isSensorFieldId,
+  type BannerCorner,
+  type TextBannerCorners,
+} from "./sensor-fields";
 import { UPLOAD_DIR } from "./paths";
 
-const DISPLAY_MODES: DisplayMode[] = ["truenas", "original", "custom", "off"];
+const DISPLAY_MODES: DisplayMode[] = [
+  "truenas",
+  "sensors",
+  "text",
+  "custom",
+  "off",
+];
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
@@ -13,6 +27,101 @@ export function isDisplayMode(value: unknown): value is DisplayMode {
 
 export function isValidTime(value: unknown): value is string {
   return typeof value === "string" && TIME_PATTERN.test(value);
+}
+
+export function isValidHexColor(value: unknown): value is string {
+  return typeof value === "string" && HEX_COLOR_PATTERN.test(value);
+}
+
+export function validateTextBannerCorners(
+  input: Partial<TextBannerCorners> | undefined,
+  fallback: TextBannerCorners = DEFAULT_TEXT_BANNER_CORNERS,
+): TextBannerCorners {
+  const corners: BannerCorner[] = [
+    "topLeft",
+    "topRight",
+    "bottomLeft",
+    "bottomRight",
+  ];
+
+  const result = { ...fallback };
+
+  for (const corner of corners) {
+    const value = input?.[corner] ?? fallback[corner];
+    if (!isSensorFieldId(value)) {
+      throw new Error(`Invalid sensor selection for ${corner}`);
+    }
+    result[corner] = value;
+  }
+
+  return result;
+}
+
+export function validateTextBanner(
+  input: Partial<TextBannerSettings> | undefined,
+  fallback: TextBannerSettings = DEFAULT_TEXT_BANNER,
+): TextBannerSettings {
+  const text = (input?.text ?? fallback.text).trim();
+
+  if (!text) {
+    throw new Error("Text banner requires at least one character");
+  }
+
+  if (text.length > 80) {
+    throw new Error("Text banner supports up to 80 characters");
+  }
+
+  const textColor = input?.textColor ?? fallback.textColor;
+  const backgroundColor = input?.backgroundColor ?? fallback.backgroundColor;
+  const cornerColor = input?.cornerColor ?? fallback.cornerColor;
+
+  if (
+    !isValidHexColor(textColor) ||
+    !isValidHexColor(backgroundColor) ||
+    !isValidHexColor(cornerColor)
+  ) {
+    throw new Error("Colors must be hex values like #0b1220");
+  }
+
+  return {
+    text,
+    textColor: textColor.toLowerCase(),
+    backgroundColor: backgroundColor.toLowerCase(),
+    cornerColor: cornerColor.toLowerCase(),
+    corners: validateTextBannerCorners(input?.corners, fallback.corners),
+  };
+}
+
+function mergeTextBanner(
+  input: Partial<TextBannerSettings> | undefined,
+  strict: boolean,
+): TextBannerSettings {
+  const raw = {
+    ...DEFAULT_TEXT_BANNER,
+    ...input,
+    corners: {
+      ...DEFAULT_TEXT_BANNER_CORNERS,
+      ...input?.corners,
+    },
+  };
+
+  if (strict) {
+    return validateTextBanner(raw, DEFAULT_TEXT_BANNER);
+  }
+
+  return {
+    text: raw.text.slice(0, 80),
+    textColor: isValidHexColor(raw.textColor)
+      ? raw.textColor.toLowerCase()
+      : DEFAULT_TEXT_BANNER.textColor,
+    backgroundColor: isValidHexColor(raw.backgroundColor)
+      ? raw.backgroundColor.toLowerCase()
+      : DEFAULT_TEXT_BANNER.backgroundColor,
+    cornerColor: isValidHexColor(raw.cornerColor)
+      ? raw.cornerColor.toLowerCase()
+      : DEFAULT_TEXT_BANNER.cornerColor,
+    corners: validateTextBannerCorners(raw.corners, DEFAULT_TEXT_BANNER_CORNERS),
+  };
 }
 
 export function sanitizeCustomImagePath(
@@ -56,6 +165,13 @@ export function validateConfig(input: Partial<DisplayConfig>): DisplayConfig {
 
   const displayMode = input.displayMode ?? "truenas";
   let customImagePath: string | null = null;
+  let textBanner: TextBannerSettings;
+
+  if (displayMode === "text") {
+    textBanner = mergeTextBanner(input.textBanner, true);
+  } else {
+    textBanner = mergeTextBanner(input.textBanner, false);
+  }
 
   if (displayMode === "custom") {
     customImagePath = sanitizeCustomImagePath(input.customImagePath ?? null);
@@ -67,6 +183,7 @@ export function validateConfig(input: Partial<DisplayConfig>): DisplayConfig {
   return {
     displayMode,
     customImagePath,
+    textBanner,
     schedule: {
       enabled: schedule?.enabled ?? false,
       displayOnTime: schedule?.displayOnTime ?? "08:00",

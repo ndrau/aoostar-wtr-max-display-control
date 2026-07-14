@@ -1,12 +1,15 @@
-import { execFile } from "child_process";
 import { access } from "fs/promises";
-import { promisify } from "util";
-import { enqueueDisplayTask } from "./display-queue";
+import { stopPanelMode, startPanelMode } from "./display-panel";
+import { runAsterctl } from "./asterctl-runner";
 import { appendLog } from "./logger";
-import { ASTERCTL_PATH, DEVICE, TRUENAS_LOGO_PATH } from "./paths";
+import { DEVICE, TRUENAS_LOGO_PATH } from "./paths";
+import { readSensorSnapshot } from "./sensors";
+import { generateTextBannerImage } from "./text-banner";
+import {
+  startTextBannerLive,
+  stopTextBannerLive,
+} from "./text-banner-live";
 import type { DisplayConfig, DisplayMode } from "./types";
-
-const execFileAsync = promisify(execFile);
 
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -17,39 +20,22 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function runAsterctlUnsafe(args: string[]): Promise<string> {
-  const command = `${ASTERCTL_PATH} ${args.join(" ")}`;
-  await appendLog("info", "asterctl", "Running command", command);
-
-  try {
-    const { stdout, stderr } = await execFileAsync(ASTERCTL_PATH, args, {
-      timeout: 30_000,
-      maxBuffer: 1024 * 1024,
-    });
-
-    const output = stderr?.trim() || stdout?.trim() || "Command completed";
-    await appendLog("info", "asterctl", "Command finished", output);
-    return output;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    await appendLog("error", "asterctl", "Command failed", message);
-    throw error;
-  }
-}
-
-export async function runAsterctl(args: string[]): Promise<string> {
-  return enqueueDisplayTask(() => runAsterctlUnsafe(args));
-}
-
 export function resolveModeArgs(
   mode: DisplayMode,
   customImagePath: string | null,
+  textBannerImagePath: string | null = null,
 ): string[] {
   switch (mode) {
     case "truenas":
       return ["--image", TRUENAS_LOGO_PATH];
-    case "original":
-      return ["--on"];
+    case "sensors":
+      return [];
+    case "text": {
+      if (!textBannerImagePath) {
+        throw new Error("Text banner image missing");
+      }
+      return ["--image", textBannerImagePath];
+    }
     case "custom": {
       if (!customImagePath) {
         throw new Error("No custom image configured");
@@ -66,13 +52,34 @@ export function resolveModeArgs(
 export async function applyDisplayMode(
   mode: DisplayMode,
   customImagePath: string | null,
+  textBannerImagePath: string | null = null,
 ): Promise<string> {
-  const args = ["--device", DEVICE, ...resolveModeArgs(mode, customImagePath)];
+  if (mode === "sensors") {
+    await stopTextBannerLive();
+    await appendLog("info", "display", "Applying display mode: sensors");
+    return startPanelMode();
+  }
+
+  await stopPanelMode();
+  await stopTextBannerLive();
+
+  const args = [
+    "--device",
+    DEVICE,
+    ...resolveModeArgs(mode, customImagePath, textBannerImagePath),
+  ];
 
   if (mode === "custom") {
     const imagePath = customImagePath;
     if (!imagePath || !(await fileExists(imagePath))) {
       throw new Error("Custom image file not found");
+    }
+  }
+
+  if (mode === "text") {
+    const imagePath = textBannerImagePath;
+    if (!imagePath || !(await fileExists(imagePath))) {
+      throw new Error("Text banner image file not found");
     }
   }
 
@@ -85,20 +92,39 @@ export async function applyDisplayMode(
 }
 
 export async function applyConfig(config: DisplayConfig): Promise<string> {
+  if (config.displayMode === "text") {
+    await stopPanelMode();
+    await stopTextBannerLive();
+    await appendLog("info", "display", "Generating text banner image");
+
+    const snapshot = await readSensorSnapshot();
+    const imagePath = await generateTextBannerImage(
+      config.textBanner,
+      snapshot.values,
+    );
+    const result = await applyDisplayMode("text", null, imagePath);
+    await startTextBannerLive(config.textBanner);
+    return result;
+  }
+
   return applyDisplayMode(config.displayMode, config.customImagePath);
 }
 
 export async function quickCommand(
-  command: "on" | "off" | "original",
+  command: "on" | "off" | "sensors",
 ): Promise<string> {
   await appendLog("info", "display", `Quick action: ${command}`);
 
-  if (command === "off") {
-    return runAsterctl(["--device", DEVICE, "--off"]);
+  if (command === "sensors") {
+    await stopTextBannerLive();
+    return startPanelMode();
   }
 
-  if (command === "original") {
-    return runAsterctl(["--device", DEVICE, "--on"]);
+  await stopPanelMode();
+  await stopTextBannerLive();
+
+  if (command === "off") {
+    return runAsterctl(["--device", DEVICE, "--off"]);
   }
 
   return runAsterctl(["--device", DEVICE, "--image", TRUENAS_LOGO_PATH]);
