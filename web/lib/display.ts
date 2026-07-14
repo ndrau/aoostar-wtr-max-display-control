@@ -1,7 +1,7 @@
 import { access } from "fs/promises";
-import { ensureDisplayDeviceReleased } from "./display-device";
-import { stopPanelMode, startPanelMode } from "./display-panel";
-import { runAsterctl } from "./asterctl-runner";
+import { enqueueDisplayTask } from "./display-queue";
+import { startPanelModeDirect } from "./display-panel";
+import { runAsterctlDirect } from "./asterctl-runner";
 import { appendLog } from "./logger";
 import { DEVICE, TRUENAS_LOGO_PATH } from "./paths";
 import { loadAllSensorValues } from "./sensor-sources";
@@ -50,7 +50,7 @@ export function resolveModeArgs(
   }
 }
 
-export async function applyDisplayMode(
+async function applyDisplayModeInner(
   mode: DisplayMode,
   customImagePath: string | null,
   textBannerImagePath: string | null = null,
@@ -58,12 +58,10 @@ export async function applyDisplayMode(
   if (mode === "sensors") {
     await stopTextBannerLive();
     await appendLog("info", "display", "Applying display mode: sensors");
-    return startPanelMode();
+    return startPanelModeDirect();
   }
 
-  await stopPanelMode();
   await stopTextBannerLive();
-  await ensureDisplayDeviceReleased();
 
   const args = [
     "--device",
@@ -90,12 +88,21 @@ export async function applyDisplayMode(
   }
 
   await appendLog("info", "display", `Applying display mode: ${mode}`);
-  return runAsterctl(args);
+  return runAsterctlDirect(args);
 }
 
-export async function applyConfig(config: DisplayConfig): Promise<string> {
+export async function applyDisplayMode(
+  mode: DisplayMode,
+  customImagePath: string | null,
+  textBannerImagePath: string | null = null,
+): Promise<string> {
+  return enqueueDisplayTask(() =>
+    applyDisplayModeInner(mode, customImagePath, textBannerImagePath),
+  );
+}
+
+async function applyConfigInner(config: DisplayConfig): Promise<string> {
   if (config.displayMode === "text") {
-    await ensureDisplayDeviceReleased();
     await stopTextBannerLive();
     await appendLog("info", "display", "Generating text banner image");
 
@@ -105,30 +112,39 @@ export async function applyConfig(config: DisplayConfig): Promise<string> {
       snapshot,
     );
     await appendLog("info", "display", "Applying display mode: text");
-    await runAsterctl(["--device", DEVICE, "--image", imagePath]);
+    await runAsterctlDirect(["--device", DEVICE, "--image", imagePath]);
     await startTextBannerLive(config.textBanner);
     return "Text banner applied";
   }
 
-  return applyDisplayMode(config.displayMode, config.customImagePath);
+  return applyDisplayModeInner(config.displayMode, config.customImagePath);
 }
 
-export async function quickCommand(
+export async function applyConfig(config: DisplayConfig): Promise<string> {
+  return enqueueDisplayTask(() => applyConfigInner(config));
+}
+
+async function quickCommandInner(
   command: "on" | "off" | "sensors",
 ): Promise<string> {
   await appendLog("info", "display", `Quick action: ${command}`);
 
   if (command === "sensors") {
     await stopTextBannerLive();
-    return startPanelMode();
+    return startPanelModeDirect();
   }
 
-  await stopPanelMode();
   await stopTextBannerLive();
 
   if (command === "off") {
-    return runAsterctl(["--device", DEVICE, "--off"]);
+    return runAsterctlDirect(["--device", DEVICE, "--off"]);
   }
 
-  return runAsterctl(["--device", DEVICE, "--image", TRUENAS_LOGO_PATH]);
+  return runAsterctlDirect(["--device", DEVICE, "--image", TRUENAS_LOGO_PATH]);
+}
+
+export async function quickCommand(
+  command: "on" | "off" | "sensors",
+): Promise<string> {
+  return enqueueDisplayTask(() => quickCommandInner(command));
 }

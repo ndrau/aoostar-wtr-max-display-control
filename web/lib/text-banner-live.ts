@@ -7,7 +7,7 @@ import {
 import { loadAllSensorValues } from "./sensor-sources";
 import { hasCornerSensors } from "./sensor-fields";
 import { generateTextBannerImage } from "./text-banner";
-import { runAsterctl } from "./asterctl-runner";
+import { runAsterctlDirect } from "./asterctl-runner";
 import type { TextBannerSettings } from "./types";
 
 const REFRESH_MS = 3_000;
@@ -29,7 +29,7 @@ async function refreshTextBanner(): Promise<void> {
     activeSettings,
     snapshot,
   );
-  await runAsterctl(["--device", DEVICE, "--image", imagePath]);
+  await runAsterctlDirect(["--device", DEVICE, "--image", imagePath]);
 }
 
 export async function startTextBannerLive(

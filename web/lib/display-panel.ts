@@ -9,6 +9,7 @@ import {
   stopPanelSensorMapper,
   writePanelSensorFile,
 } from "./sensor-panel-mapper";
+import { releaseDisplayDeviceUnsafe } from "./display-device";
 import {
   ASTERCTL_PATH,
   CONFIG_DIR,
@@ -54,24 +55,28 @@ export function isPanelModeRunning(): boolean {
   return panelRunning || isPanelChildRunning();
 }
 
-export async function stopPanelMode(): Promise<void> {
+export async function stopPanelModeUnsafe(): Promise<void> {
   stopPanelSensorMapper();
 
-  if (!panelRunning && !panelProcess) {
-    return;
+  const hadPanel = panelRunning || panelProcess !== null;
+
+  if (panelProcess) {
+    await appendLog("info", "panel", "Stopping sensor dashboard processes");
+    await killProcess(panelProcess, "asterctl panel");
+  } else if (hadPanel) {
+    await appendLog("info", "panel", "Resetting sensor dashboard state");
   }
 
-  await appendLog("info", "panel", "Stopping sensor dashboard processes");
-  await killProcess(panelProcess, "asterctl panel");
   panelProcess = null;
   panelRunning = false;
-  await releaseSensorCollector("panel");
+
+  if (hadPanel) {
+    await releaseSensorCollector("panel");
+  }
 }
 
-export async function startPanelMode(): Promise<string> {
-  if (panelRunning) {
-    await stopPanelMode();
-  }
+export async function startPanelModeDirect(): Promise<string> {
+  await releaseDisplayDeviceUnsafe();
 
   await acquireSensorCollector("panel");
   startPanelSensorMapper();

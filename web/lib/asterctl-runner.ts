@@ -27,8 +27,10 @@ async function runAsterctlUnsafe(args: string[]): Promise<string> {
   }
 }
 
+export async function runAsterctlDirect(args: string[]): Promise<string> {
+  return runAsterctlWithDeviceLock(args, runAsterctlUnsafe);
+}
+
 export async function runAsterctl(args: string[]): Promise<string> {
-  return enqueueDisplayTask(() =>
-    runAsterctlWithDeviceLock(args, runAsterctlUnsafe),
-  );
+  return enqueueDisplayTask(() => runAsterctlDirect(args));
 }

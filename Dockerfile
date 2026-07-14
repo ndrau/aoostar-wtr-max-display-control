@@ -20,6 +20,7 @@ RUN apt-get update \
       fonts-dejavu-core \
       smartmontools \
       sudo \
+      procps \
     && rm -rf /var/lib/apt/lists/* \
     && echo 'root ALL=(ALL) NOPASSWD: /usr/sbin/smartctl' > /etc/sudoers.d/smartctl \
     && chmod 440 /etc/sudoers.d/smartctl
