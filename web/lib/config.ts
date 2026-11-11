@@ -1,65 +1,29 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { CONFIG_PATH, DATA_DIR, UPLOAD_DIR } from "./paths";
-import { DEFAULT_CONFIG, DEFAULT_TEXT_BANNER, type DisplayConfig, type DisplayMode } from "./types";
+import { DEFAULT_CONFIG, type DisplayConfig } from "./types";
+import { normalizeConfig } from "./validation";
 
 async function ensureDataDir() {
   await mkdir(DATA_DIR, { recursive: true });
   await mkdir(UPLOAD_DIR, { recursive: true });
 }
 
-function normalizeDisplayMode(value: unknown): DisplayMode | undefined {
-  if (value === "original") {
-    return "sensors";
-  }
-
-  if (
-    value === "truenas" ||
-    value === "sensors" ||
-    value === "text" ||
-    value === "custom" ||
-    value === "off"
-  ) {
-    return value;
-  }
-
-  return undefined;
-}
-
-export function mergeConfig(parsed: Partial<DisplayConfig>): DisplayConfig {
-  const displayMode = normalizeDisplayMode(parsed.displayMode);
-
+/** Overlays a partial update (e.g. an API body) onto a full config, section by section. */
+export function mergeConfig(
+  base: DisplayConfig,
+  patch: Partial<DisplayConfig>,
+): Partial<DisplayConfig> {
   return {
-    ...DEFAULT_CONFIG,
-    ...parsed,
-    ...(displayMode ? { displayMode } : {}),
-    textBanner: {
-      ...DEFAULT_TEXT_BANNER,
-      ...parsed.textBanner,
-      showCornerSensors:
-        typeof parsed.textBanner?.showCornerSensors === "boolean"
-          ? parsed.textBanner.showCornerSensors
-          : DEFAULT_TEXT_BANNER.showCornerSensors,
-      showClock:
-        typeof parsed.textBanner?.showClock === "boolean"
-          ? parsed.textBanner.showClock
-          : DEFAULT_TEXT_BANNER.showClock,
-      fontSizeAuto:
-        typeof parsed.textBanner?.fontSizeAuto === "boolean"
-          ? parsed.textBanner.fontSizeAuto
-          : DEFAULT_TEXT_BANNER.fontSizeAuto,
-      fontSize:
-        typeof parsed.textBanner?.fontSize === "number"
-          ? parsed.textBanner.fontSize
-          : DEFAULT_TEXT_BANNER.fontSize,
-      corners: {
-        ...DEFAULT_TEXT_BANNER.corners,
-        ...parsed.textBanner?.corners,
-      },
+    ...base,
+    ...patch,
+    logo: { ...base.logo, ...patch.logo },
+    textBanner: { ...base.textBanner, ...patch.textBanner },
+    overlay: {
+      ...base.overlay,
+      ...patch.overlay,
+      corners: { ...base.overlay.corners, ...patch.overlay?.corners },
     },
-    schedule: {
-      ...DEFAULT_CONFIG.schedule,
-      ...parsed.schedule,
-    },
+    schedule: { ...base.schedule, ...patch.schedule },
   };
 }
 
@@ -68,8 +32,7 @@ export async function readConfig(): Promise<DisplayConfig> {
 
   try {
     const raw = await readFile(CONFIG_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<DisplayConfig>;
-    return mergeConfig(parsed);
+    return normalizeConfig(JSON.parse(raw));
   } catch {
     await writeConfig(DEFAULT_CONFIG);
     return DEFAULT_CONFIG;

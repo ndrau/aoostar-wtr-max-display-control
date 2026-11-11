@@ -1,6 +1,7 @@
 "use client";
 
 import type { DisplayConfig } from "@/lib/types";
+import { Switch } from "./Switch";
 
 export function ScheduleEditor({
   schedule,
@@ -11,19 +12,12 @@ export function ScheduleEditor({
 }) {
   return (
     <div className="stack">
-      <label className="switch-row">
-        <input
-          type="checkbox"
-          checked={schedule.enabled}
-          onChange={(event) =>
-            onChange({ ...schedule, enabled: event.target.checked })
-          }
-        />
-        <span>
-          <strong>Täglicher Zeitplan</strong>
-          <small>Display automatisch ein- und ausschalten</small>
-        </span>
-      </label>
+      <Switch
+        checked={schedule.enabled}
+        onChange={(enabled) => onChange({ ...schedule, enabled })}
+        title="Täglicher Zeitplan"
+        description="Display automatisch ein- und ausschalten"
+      />
 
       <div className={`schedule-fields ${schedule.enabled ? "" : "is-disabled"}`}>
         <div className="field">

@@ -1,63 +1,16 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import sharp from "sharp";
-import {
-  formatCornerLabel,
-  type BannerCorner,
-} from "./sensor-fields";
-import { TEXT_BANNER_PATH, UPLOAD_DIR } from "./paths";
-import { formatBannerClock } from "./format";
-import {
-  BANNER_CLOCK_FONT_SIZE,
-  BANNER_CLOCK_Y,
-  BANNER_CORNER_FONT_SIZE,
-  BANNER_CORNER_PADDING_X,
-  BANNER_CORNER_PADDING_Y,
-  DISPLAY_HEIGHT,
-  DISPLAY_WIDTH,
-} from "./display-dimensions";
+import { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "./display-dimensions";
 import { resolveBannerFontSize } from "./text-banner-font";
 import type { TextBannerSettings } from "./types";
 
-export { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "./display-dimensions";
+export const FONT_FAMILY = "DejaVu Sans, Liberation Sans, sans-serif";
+
+const BANNER_FONTS = {
+  serif: { family: "Instrument Serif, Georgia, serif", weight: 400 },
+  sans: { family: FONT_FAMILY, weight: 700 },
+} as const;
 const MAX_TEXT_LENGTH = 80;
 
-export {
-  TEXT_BANNER_FONT_DEFAULT,
-  TEXT_BANNER_FONT_MAX,
-  TEXT_BANNER_FONT_MIN,
-} from "./text-banner-font";
-
-const FONT_FAMILY = "DejaVu Sans, Liberation Sans, sans-serif";
-const CORNER_FONT_SIZE = BANNER_CORNER_FONT_SIZE;
-const CLOCK_FONT_SIZE = BANNER_CLOCK_FONT_SIZE;
-const CLOCK_Y = BANNER_CLOCK_Y;
-const CORNER_PADDING_X = BANNER_CORNER_PADDING_X;
-const CORNER_PADDING_Y = BANNER_CORNER_PADDING_Y;
-
-const CORNER_LAYOUT: Record<
-  BannerCorner,
-  { x: number; y: number; anchor: "start" | "end" }
-> = {
-  topLeft: { x: CORNER_PADDING_X, y: CORNER_PADDING_Y, anchor: "start" },
-  topRight: {
-    x: DISPLAY_WIDTH - CORNER_PADDING_X,
-    y: CORNER_PADDING_Y,
-    anchor: "end",
-  },
-  bottomLeft: {
-    x: CORNER_PADDING_X,
-    y: DISPLAY_HEIGHT - CORNER_PADDING_Y,
-    anchor: "start",
-  },
-  bottomRight: {
-    x: DISPLAY_WIDTH - CORNER_PADDING_X,
-    y: DISPLAY_HEIGHT - CORNER_PADDING_Y,
-    anchor: "end",
-  },
-};
-
-function escapeXml(value: string): string {
+export function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -80,97 +33,22 @@ function buildTextElements(text: string, fontSize: number): string {
     .join("");
 }
 
-function buildClockElement(settings: TextBannerSettings, now: Date): string {
-  if (!settings.showClock) {
-    return "";
-  }
-
-  return `<text
-    x="${DISPLAY_WIDTH / 2}"
-    y="${CLOCK_Y}"
-    fill="${settings.cornerColor}"
-    font-family="${FONT_FAMILY}"
-    font-size="${CLOCK_FONT_SIZE}"
-    font-weight="600"
-    text-anchor="middle"
-  >${escapeXml(formatBannerClock(now))}</text>`;
-}
-
-function buildCornerElements(
-  settings: TextBannerSettings,
-  sensorValues: Record<string, string>,
-): string {
-  if (!settings.showCornerSensors) {
-    return "";
-  }
-
-  return (Object.keys(CORNER_LAYOUT) as BannerCorner[])
-    .map((corner) => {
-      const fieldId = settings.corners[corner];
-      const label = formatCornerLabel(fieldId, sensorValues);
-      if (!label) {
-        return "";
-      }
-
-      const layout = CORNER_LAYOUT[corner];
-      return `<text
-        x="${layout.x}"
-        y="${layout.y}"
-        fill="${settings.cornerColor}"
-        font-family="${FONT_FAMILY}"
-        font-size="${CORNER_FONT_SIZE}"
-        font-weight="600"
-        text-anchor="${layout.anchor}"
-      >${escapeXml(label)}</text>`;
-    })
-    .join("\n");
-}
-
-export function buildTextBannerSvg(
-  settings: TextBannerSettings,
-  sensorValues: Record<string, string> = {},
-  now: Date = new Date(),
-): string {
+export function buildTextBannerSvg(settings: TextBannerSettings): string {
   const text = settings.text.trim().slice(0, MAX_TEXT_LENGTH);
   const fontSize = resolveBannerFontSize(settings);
+  const font = BANNER_FONTS[settings.font];
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${DISPLAY_WIDTH}" height="${DISPLAY_HEIGHT}" viewBox="0 0 ${DISPLAY_WIDTH} ${DISPLAY_HEIGHT}">
   <rect width="100%" height="100%" fill="${settings.backgroundColor}" />
-  ${buildClockElement(settings, now)}
   <text
     text-anchor="middle"
     fill="${settings.textColor}"
-    font-family="${FONT_FAMILY}"
+    font-family="${font.family}"
     font-size="${fontSize}"
-    font-weight="700"
+    font-weight="${font.weight}"
   >
     ${buildTextElements(text, fontSize)}
   </text>
-  ${buildCornerElements(settings, sensorValues)}
 </svg>`;
-}
-
-export async function generateTextBannerImage(
-  settings: TextBannerSettings,
-  sensorValues: Record<string, string> = {},
-  outputPath: string = TEXT_BANNER_PATH,
-): Promise<string> {
-  const resolved = path.resolve(outputPath);
-  const uploadRoot = path.resolve(UPLOAD_DIR);
-
-  if (
-    !resolved.startsWith(`${uploadRoot}${path.sep}`) &&
-    resolved !== uploadRoot
-  ) {
-    throw new Error("Text banner image must stay inside uploads directory");
-  }
-
-  await mkdir(uploadRoot, { recursive: true });
-
-  const svg = buildTextBannerSvg(settings, sensorValues, new Date());
-  const png = await sharp(Buffer.from(svg)).png().toBuffer();
-  await writeFile(resolved, png);
-
-  return resolved;
 }

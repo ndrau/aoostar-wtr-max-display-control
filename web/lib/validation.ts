@@ -1,30 +1,53 @@
 import path from "path";
-import type { DisplayConfig, DisplayMode, TextBannerSettings } from "./types";
-import { DEFAULT_TEXT_BANNER } from "./types";
+import type {
+  DisplayConfig,
+  DisplayMode,
+  LogoBadge,
+  LogoBrand,
+  LogoLayout,
+  LogoSettings,
+  OverlaySettings,
+  TextBannerFont,
+  TextBannerSettings,
+} from "./types";
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_LOGO,
+  DEFAULT_OVERLAY,
+  DEFAULT_TEXT_BANNER,
+  LOGO_SCALE_MAX,
+  LOGO_SCALE_MIN,
+} from "./types";
 import {
   TEXT_BANNER_FONT_DEFAULT,
   TEXT_BANNER_FONT_MAX,
   TEXT_BANNER_FONT_MIN,
 } from "./text-banner-font";
 import {
-  DEFAULT_TEXT_BANNER_CORNERS,
   isSensorFieldId,
   type BannerCorner,
   type TextBannerCorners,
 } from "./sensor-fields";
 import { UPLOAD_DIR } from "./paths";
 
-const DISPLAY_MODES: DisplayMode[] = [
-  "truenas",
-  "sensors",
-  "text",
-  "custom",
-  "off",
+const DISPLAY_MODES: DisplayMode[] = ["logo", "sensors", "text", "custom", "off"];
+const LOGO_BRANDS: LogoBrand[] = ["rau-media", "truenas"];
+const LOGO_LAYOUTS: LogoLayout[] = ["quer", "stacked", "camera"];
+const LOGO_BADGES: LogoBadge[] = ["r", "rm", "none"];
+const TEXT_FONTS: TextBannerFont[] = ["serif", "sans"];
+const CORNERS: BannerCorner[] = [
+  "topLeft",
+  "topRight",
+  "bottomLeft",
+  "bottomRight",
 ];
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const MAX_TEXT_LENGTH = 80;
+
+type Loose = Record<string, unknown> | null | undefined;
 
 export function isDisplayMode(value: unknown): value is DisplayMode {
   return typeof value === "string" && DISPLAY_MODES.includes(value as DisplayMode);
@@ -34,154 +57,154 @@ export function isValidTime(value: unknown): value is string {
   return typeof value === "string" && TIME_PATTERN.test(value);
 }
 
-function normalizeFontSize(value: unknown): number {
+export function isValidHexColor(value: unknown): value is string {
+  return typeof value === "string" && HEX_COLOR_PATTERN.test(value);
+}
+
+function pick<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function color(value: unknown, fallback: string): string {
+  return isValidHexColor(value) ? value.toLowerCase() : fallback;
+}
+
+function bool(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function clampNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
   const numeric =
     typeof value === "number"
       ? value
       : typeof value === "string"
         ? Number.parseInt(value, 10)
-        : TEXT_BANNER_FONT_DEFAULT;
+        : Number.NaN;
 
   if (Number.isNaN(numeric)) {
-    return TEXT_BANNER_FONT_DEFAULT;
+    return fallback;
   }
 
-  return Math.min(
-    TEXT_BANNER_FONT_MAX,
-    Math.max(TEXT_BANNER_FONT_MIN, Math.round(numeric)),
-  );
+  return Math.min(max, Math.max(min, Math.round(numeric)));
 }
 
-export function isValidHexColor(value: unknown): value is string {
-  return typeof value === "string" && HEX_COLOR_PATTERN.test(value);
-}
+function normalizeCorners(input: Loose): TextBannerCorners {
+  const result = { ...DEFAULT_OVERLAY.corners };
 
-function mergeTextBannerCorners(
-  input: Partial<TextBannerCorners> | undefined,
-  fallback: TextBannerCorners = DEFAULT_TEXT_BANNER_CORNERS,
-): TextBannerCorners {
-  const corners: BannerCorner[] = [
-    "topLeft",
-    "topRight",
-    "bottomLeft",
-    "bottomRight",
-  ];
-
-  const result = { ...fallback };
-
-  for (const corner of corners) {
-    const value = input?.[corner] ?? fallback[corner];
-    result[corner] = isSensorFieldId(value) ? value : fallback[corner];
-  }
-
-  return result;
-}
-
-export function validateTextBannerCorners(
-  input: Partial<TextBannerCorners> | undefined,
-  fallback: TextBannerCorners = DEFAULT_TEXT_BANNER_CORNERS,
-): TextBannerCorners {
-  const corners: BannerCorner[] = [
-    "topLeft",
-    "topRight",
-    "bottomLeft",
-    "bottomRight",
-  ];
-
-  const result = { ...fallback };
-
-  for (const corner of corners) {
-    const value = input?.[corner] ?? fallback[corner];
-    if (!isSensorFieldId(value)) {
-      throw new Error(`Invalid sensor selection for ${corner}`);
+  for (const corner of CORNERS) {
+    const value = input?.[corner];
+    if (isSensorFieldId(value)) {
+      result[corner] = value;
     }
-    result[corner] = value;
   }
 
   return result;
 }
 
-export function validateTextBanner(
-  input: Partial<TextBannerSettings> | undefined,
-  fallback: TextBannerSettings = DEFAULT_TEXT_BANNER,
-): TextBannerSettings {
-  const text = (input?.text ?? fallback.text).trim();
-
-  if (!text) {
-    throw new Error("Text banner requires at least one character");
-  }
-
-  if (text.length > 80) {
-    throw new Error("Text banner supports up to 80 characters");
-  }
-
-  const textColor = input?.textColor ?? fallback.textColor;
-  const backgroundColor = input?.backgroundColor ?? fallback.backgroundColor;
-  const cornerColor = input?.cornerColor ?? fallback.cornerColor;
-
-  if (
-    !isValidHexColor(textColor) ||
-    !isValidHexColor(backgroundColor) ||
-    !isValidHexColor(cornerColor)
-  ) {
-    throw new Error("Colors must be hex values like #0b1220");
-  }
-
+function normalizeLogo(input: Loose): LogoSettings {
   return {
-    text,
-    textColor: textColor.toLowerCase(),
-    backgroundColor: backgroundColor.toLowerCase(),
-    cornerColor: cornerColor.toLowerCase(),
-    showCornerSensors: input?.showCornerSensors ?? fallback.showCornerSensors,
-    showClock: input?.showClock ?? fallback.showClock,
-    fontSizeAuto: input?.fontSizeAuto ?? fallback.fontSizeAuto,
-    fontSize: normalizeFontSize(input?.fontSize ?? fallback.fontSize),
-    corners: validateTextBannerCorners(input?.corners, fallback.corners),
+    brand: pick(input?.brand, LOGO_BRANDS, DEFAULT_LOGO.brand),
+    layout: pick(input?.layout, LOGO_LAYOUTS, DEFAULT_LOGO.layout),
+    badge: pick(input?.badge, LOGO_BADGES, DEFAULT_LOGO.badge),
+    backgroundColor: color(input?.backgroundColor, DEFAULT_LOGO.backgroundColor),
+    scale: clampNumber(
+      input?.scale,
+      LOGO_SCALE_MIN,
+      LOGO_SCALE_MAX,
+      DEFAULT_LOGO.scale,
+    ),
   };
 }
 
-function mergeTextBanner(
-  input: Partial<TextBannerSettings> | undefined,
-  strict: boolean,
-): TextBannerSettings {
-  const raw = {
-    ...DEFAULT_TEXT_BANNER,
-    ...input,
-    corners: {
-      ...DEFAULT_TEXT_BANNER_CORNERS,
-      ...input?.corners,
-    },
+function normalizeTextBanner(input: Loose): TextBannerSettings {
+  return {
+    text:
+      typeof input?.text === "string"
+        ? input.text.slice(0, MAX_TEXT_LENGTH)
+        : DEFAULT_TEXT_BANNER.text,
+    font: pick(input?.font, TEXT_FONTS, DEFAULT_TEXT_BANNER.font),
+    textColor: color(input?.textColor, DEFAULT_TEXT_BANNER.textColor),
+    backgroundColor: color(
+      input?.backgroundColor,
+      DEFAULT_TEXT_BANNER.backgroundColor,
+    ),
+    fontSizeAuto: bool(input?.fontSizeAuto, DEFAULT_TEXT_BANNER.fontSizeAuto),
+    fontSize: clampNumber(
+      input?.fontSize,
+      TEXT_BANNER_FONT_MIN,
+      TEXT_BANNER_FONT_MAX,
+      TEXT_BANNER_FONT_DEFAULT,
+    ),
   };
+}
 
-  if (strict) {
-    return validateTextBanner(raw, DEFAULT_TEXT_BANNER);
-  }
+function normalizeOverlay(input: Loose): OverlaySettings {
+  return {
+    showClock: bool(input?.showClock, DEFAULT_OVERLAY.showClock),
+    showCornerSensors: bool(
+      input?.showCornerSensors,
+      DEFAULT_OVERLAY.showCornerSensors,
+    ),
+    corners: normalizeCorners(input?.corners as Loose),
+  };
+}
+
+/** Configs written before logo scenes existed keep working. */
+function migrateLegacy(raw: Record<string, unknown>): Record<string, unknown> {
+  const legacyMode = raw.displayMode;
+  const displayMode =
+    legacyMode === "original"
+      ? "sensors"
+      : legacyMode === "truenas"
+        ? "logo"
+        : legacyMode;
+
+  const legacyBanner = raw.textBanner as Loose;
+  const overlay =
+    raw.overlay ??
+    (legacyBanner
+      ? {
+          showClock: legacyBanner.showClock,
+          showCornerSensors: legacyBanner.showCornerSensors,
+          corners: legacyBanner.corners,
+        }
+      : undefined);
+
+  return { ...raw, displayMode, overlay };
+}
+
+/** Lenient: unknown or invalid values fall back to defaults, never throws. */
+export function normalizeConfig(input: unknown): DisplayConfig {
+  const raw = migrateLegacy(
+    input && typeof input === "object" ? (input as Record<string, unknown>) : {},
+  );
+  const schedule = raw.schedule as Loose;
 
   return {
-    text: raw.text.slice(0, 80),
-    textColor: isValidHexColor(raw.textColor)
-      ? raw.textColor.toLowerCase()
-      : DEFAULT_TEXT_BANNER.textColor,
-    backgroundColor: isValidHexColor(raw.backgroundColor)
-      ? raw.backgroundColor.toLowerCase()
-      : DEFAULT_TEXT_BANNER.backgroundColor,
-    cornerColor: isValidHexColor(raw.cornerColor)
-      ? raw.cornerColor.toLowerCase()
-      : DEFAULT_TEXT_BANNER.cornerColor,
-    showCornerSensors:
-      typeof raw.showCornerSensors === "boolean"
-        ? raw.showCornerSensors
-        : DEFAULT_TEXT_BANNER.showCornerSensors,
-    showClock:
-      typeof raw.showClock === "boolean"
-        ? raw.showClock
-        : DEFAULT_TEXT_BANNER.showClock,
-    fontSizeAuto:
-      typeof raw.fontSizeAuto === "boolean"
-        ? raw.fontSizeAuto
-        : DEFAULT_TEXT_BANNER.fontSizeAuto,
-    fontSize: normalizeFontSize(raw.fontSize),
-    corners: mergeTextBannerCorners(raw.corners, DEFAULT_TEXT_BANNER_CORNERS),
+    displayMode: pick(raw.displayMode, DISPLAY_MODES, DEFAULT_CONFIG.displayMode),
+    customImagePath:
+      typeof raw.customImagePath === "string" ? raw.customImagePath : null,
+    logo: normalizeLogo(raw.logo as Loose),
+    textBanner: normalizeTextBanner(raw.textBanner as Loose),
+    overlay: normalizeOverlay(raw.overlay as Loose),
+    schedule: {
+      enabled: bool(schedule?.enabled, DEFAULT_CONFIG.schedule.enabled),
+      displayOnTime: isValidTime(schedule?.displayOnTime)
+        ? schedule.displayOnTime
+        : DEFAULT_CONFIG.schedule.displayOnTime,
+      displayOffTime: isValidTime(schedule?.displayOffTime)
+        ? schedule.displayOffTime
+        : DEFAULT_CONFIG.schedule.displayOffTime,
+    },
   };
 }
 
@@ -202,6 +225,7 @@ export function sanitizeCustomImagePath(
   return resolved;
 }
 
+/** Strict: rejects input the user should correct before it reaches the display. */
 export function validateConfig(input: Partial<DisplayConfig>): DisplayConfig {
   if (input.displayMode !== undefined && !isDisplayMode(input.displayMode)) {
     throw new Error("Invalid display mode");
@@ -224,33 +248,28 @@ export function validateConfig(input: Partial<DisplayConfig>): DisplayConfig {
     }
   }
 
-  const displayMode = input.displayMode ?? "truenas";
-  let customImagePath: string | null = null;
-  let textBanner: TextBannerSettings;
-
-  if (displayMode === "text") {
-    textBanner = mergeTextBanner(input.textBanner, true);
-  } else {
-    textBanner = mergeTextBanner(input.textBanner, false);
-  }
-
-  if (displayMode === "custom") {
-    customImagePath = sanitizeCustomImagePath(input.customImagePath ?? null);
-    if (!customImagePath) {
-      throw new Error("Custom display mode requires an uploaded image");
+  for (const [label, value] of [
+    ["Logo background", input.logo?.backgroundColor],
+    ["Text color", input.textBanner?.textColor],
+    ["Text background", input.textBanner?.backgroundColor],
+  ] as const) {
+    if (value !== undefined && !isValidHexColor(value)) {
+      throw new Error(`${label} must be a hex color like #090b0a`);
     }
   }
 
-  return {
-    displayMode,
-    customImagePath,
-    textBanner,
-    schedule: {
-      enabled: schedule?.enabled ?? false,
-      displayOnTime: schedule?.displayOnTime ?? "08:00",
-      displayOffTime: schedule?.displayOffTime ?? "22:00",
-    },
-  };
+  const config = normalizeConfig(input);
+
+  if (config.displayMode === "text" && !config.textBanner.text.trim()) {
+    throw new Error("Text banner requires at least one character");
+  }
+
+  config.customImagePath = sanitizeCustomImagePath(config.customImagePath);
+  if (config.displayMode === "custom" && !config.customImagePath) {
+    throw new Error("Custom display mode requires an uploaded image");
+  }
+
+  return config;
 }
 
 export function validateUpload(file: File): void {

@@ -23,20 +23,7 @@ export async function PUT(request: Request) {
   try {
     const body = (await request.json()) as Partial<DisplayConfig>;
     const current = await readConfig();
-    const merged = mergeConfig({
-      ...current,
-      ...body,
-      textBanner: {
-        ...current.textBanner,
-        ...body.textBanner,
-        corners: {
-          ...current.textBanner.corners,
-          ...body.textBanner?.corners,
-        },
-      },
-      schedule: { ...current.schedule, ...body.schedule },
-    });
-    const nextConfig = validateConfig(merged);
+    const nextConfig = validateConfig(mergeConfig(current, body));
 
     await appendLog(
       "info",

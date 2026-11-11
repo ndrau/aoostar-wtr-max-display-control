@@ -44,50 +44,50 @@ export interface SensorFieldGroup {
 
 export const SENSOR_FIELD_GROUPS: SensorFieldGroup[] = [
   {
-    label: "General",
+    label: "Allgemein",
     options: [
-      { id: "none", label: "None", shortLabel: "" },
-      { id: "cpu_usage_percent", label: "CPU usage", shortLabel: "CPU" },
-      { id: "temperature_cpu", label: "CPU temperature", shortLabel: "CPU" },
-      { id: "mem_usage_percent", label: "RAM usage", shortLabel: "RAM" },
-      { id: "temperature_memory", label: "RAM temperature", shortLabel: "RAM" },
-      { id: "temperature_gpu", label: "GPU temperature", shortLabel: "GPU" },
+      { id: "none", label: "Keine", shortLabel: "" },
+      { id: "cpu_usage_percent", label: "CPU-Auslastung", shortLabel: "CPU" },
+      { id: "temperature_cpu", label: "CPU-Temperatur", shortLabel: "CPU" },
+      { id: "mem_usage_percent", label: "RAM-Auslastung", shortLabel: "RAM" },
+      { id: "temperature_memory", label: "RAM-Temperatur", shortLabel: "RAM" },
+      { id: "temperature_gpu", label: "GPU-Temperatur", shortLabel: "GPU" },
       {
         id: "temperature_motherboard",
-        label: "Motherboard temperature",
+        label: "Mainboard-Temperatur",
         shortLabel: "Board",
       },
-      { id: "system_uptime", label: "System uptime", shortLabel: "Up" },
-      { id: "load_average_1m", label: "Load average (1m)", shortLabel: "Load" },
+      { id: "system_uptime", label: "Laufzeit", shortLabel: "Up" },
+      { id: "load_average_1m", label: "Last (1 Min.)", shortLabel: "Load" },
     ],
   },
   {
-    label: "Network",
+    label: "Netzwerk",
     options: [
       {
         id: "network_primary_upload_speed",
-        label: "Network upload (primary)",
+        label: "Upload",
         shortLabel: "Up",
       },
       {
         id: "network_primary_download_speed",
-        label: "Network download (primary)",
+        label: "Download",
         shortLabel: "Down",
       },
       {
         id: "network_primary_address",
-        label: "Network IP (primary)",
+        label: "IP-Adresse",
         shortLabel: "IP",
       },
     ],
   },
   {
-    label: "Fans",
+    label: "Lüfter",
     options: [
-      { id: "fan_primary_rpm", label: "Fan 1 speed (RPM)", shortLabel: "Fan1" },
+      { id: "fan_primary_rpm", label: "Lüfter 1 (U/min)", shortLabel: "Fan1" },
       {
         id: "fan_secondary_rpm",
-        label: "Fan 2 speed (RPM)",
+        label: "Lüfter 2 (U/min)",
         shortLabel: "Fan2",
       },
     ],
@@ -95,16 +95,16 @@ export const SENSOR_FIELD_GROUPS: SensorFieldGroup[] = [
   {
     label: "SSD / NVMe",
     options: [
-      { id: "storage_ssd_0_used", label: "SSD 1 usage", shortLabel: "SSD1" },
+      { id: "storage_ssd_0_used", label: "SSD 1 belegt", shortLabel: "SSD1" },
       {
         id: "storage_ssd_0_temperature",
-        label: "SSD 1 temperature",
+        label: "SSD 1 Temperatur",
         shortLabel: "SSD1",
       },
-      { id: "storage_ssd_1_used", label: "SSD 2 usage", shortLabel: "SSD2" },
+      { id: "storage_ssd_1_used", label: "SSD 2 belegt", shortLabel: "SSD2" },
       {
         id: "storage_ssd_1_temperature",
-        label: "SSD 2 temperature",
+        label: "SSD 2 Temperatur",
         shortLabel: "SSD2",
       },
     ],
@@ -112,16 +112,16 @@ export const SENSOR_FIELD_GROUPS: SensorFieldGroup[] = [
   {
     label: "HDD",
     options: [
-      { id: "storage_hdd_0_used", label: "HDD 1 usage", shortLabel: "HDD1" },
+      { id: "storage_hdd_0_used", label: "HDD 1 belegt", shortLabel: "HDD1" },
       {
         id: "storage_hdd_0_temperature",
-        label: "HDD 1 temperature",
+        label: "HDD 1 Temperatur",
         shortLabel: "HDD1",
       },
-      { id: "storage_hdd_1_used", label: "HDD 2 usage", shortLabel: "HDD2" },
+      { id: "storage_hdd_1_used", label: "HDD 2 belegt", shortLabel: "HDD2" },
       {
         id: "storage_hdd_1_temperature",
-        label: "HDD 2 temperature",
+        label: "HDD 2 Temperatur",
         shortLabel: "HDD2",
       },
     ],
@@ -385,7 +385,7 @@ export function shouldShowCornerSensors(settings: {
   return settings.showCornerSensors && hasCornerSensors(settings.corners);
 }
 
-export function needsTextBannerLiveRefresh(settings: {
+export function needsOverlayLiveRefresh(settings: {
   showClock: boolean;
   showCornerSensors: boolean;
   corners: TextBannerCorners;
@@ -401,10 +401,10 @@ export const DEFAULT_TEXT_BANNER_CORNERS: TextBannerCorners = {
 };
 
 export const BANNER_CORNER_LABELS: Record<BannerCorner, string> = {
-  topLeft: "Top left",
-  topRight: "Top right",
-  bottomLeft: "Bottom left",
-  bottomRight: "Bottom right",
+  topLeft: "Oben links",
+  topRight: "Oben rechts",
+  bottomLeft: "Unten links",
+  bottomRight: "Unten rechts",
 };
 
 export function getStoragePanelKeys(values: Record<string, string>): string[] {

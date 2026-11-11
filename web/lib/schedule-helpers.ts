@@ -42,7 +42,7 @@ export function resolveScheduledDisplayConfig(
 ): DisplayConfig {
   if (!config.schedule.enabled || isWithinDisplayWindow(config)) {
     if (config.displayMode === "off") {
-      return { ...config, displayMode: "truenas" };
+      return { ...config, displayMode: "logo" };
     }
     return config;
   }

@@ -37,7 +37,9 @@ export function resolveBannerFontSize(settings: TextBannerSettings): number {
   if (settings.fontSizeAuto) {
     const text = settings.text.trim().slice(0, MAX_TEXT_LENGTH);
     const lineCount = Math.max(1, text.split("\n").length);
-    return estimateFontSize(text, lineCount);
+    // Instrument Serif is narrower than the sans font, so it can run larger.
+    const factor = settings.font === "serif" ? 1.2 : 1;
+    return clampFontSize(estimateFontSize(text, lineCount) * factor);
   }
 
   return clampFontSize(settings.fontSize);

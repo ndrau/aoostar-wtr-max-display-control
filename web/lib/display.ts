@@ -1,150 +1,92 @@
 import { access } from "fs/promises";
 import { enqueueDisplayTask } from "./display-queue";
+import { setDisplayMode } from "./display-state";
 import { startPanelModeDirect } from "./display-panel";
 import { runAsterctlDirect } from "./asterctl-runner";
 import { appendLog } from "./logger";
-import { DEVICE, TRUENAS_LOGO_PATH } from "./paths";
+import { DEVICE, SCENE_PATH } from "./paths";
+import { generateSceneImage, isSceneMode } from "./scene";
+import { shouldShowCornerSensors } from "./sensor-fields";
 import { loadAllSensorValues } from "./sensor-sources";
-import { generateTextBannerImage } from "./text-banner";
-import {
-  startTextBannerLive,
-  stopTextBannerLive,
-} from "./text-banner-live";
-import type { DisplayConfig, DisplayMode } from "./types";
+import { startSceneLive, stopSceneLive } from "./scene-live";
+import type { DisplayConfig } from "./types";
 
-async function fileExists(path: string): Promise<boolean> {
+export async function fileExists(target: string): Promise<boolean> {
   try {
-    await access(path);
+    await access(target);
     return true;
   } catch {
     return false;
   }
 }
 
-export function resolveModeArgs(
-  mode: DisplayMode,
-  customImagePath: string | null,
-  textBannerImagePath: string | null = null,
-): string[] {
-  switch (mode) {
-    case "truenas":
-      return ["--image", TRUENAS_LOGO_PATH];
-    case "sensors":
-      return [];
-    case "text": {
-      if (!textBannerImagePath) {
-        throw new Error("Text banner image missing");
-      }
-      return ["--image", textBannerImagePath];
-    }
-    case "custom": {
-      if (!customImagePath) {
-        throw new Error("No custom image configured");
-      }
-      return ["--image", customImagePath];
-    }
-    case "off":
-      return ["--off"];
-    default:
-      return ["--off"];
-  }
-}
+async function applyConfigInner(config: DisplayConfig): Promise<string> {
+  await stopSceneLive();
+  const mode = config.displayMode;
+  await appendLog("info", "display", `Applying display mode: ${mode}`);
 
-async function applyDisplayModeInner(
-  mode: DisplayMode,
-  customImagePath: string | null,
-  textBannerImagePath: string | null = null,
-): Promise<string> {
   if (mode === "sensors") {
-    await stopTextBannerLive();
-    await appendLog("info", "display", "Applying display mode: sensors");
-    return startPanelModeDirect();
+    const output = await startPanelModeDirect();
+    setDisplayMode(mode);
+    return output;
   }
 
-  await stopTextBannerLive();
-
-  const args = [
-    "--device",
-    DEVICE,
-    ...resolveModeArgs(mode, customImagePath, textBannerImagePath),
-  ];
+  if (mode === "off") {
+    const output = await runAsterctlDirect(["--device", DEVICE, "--off"]);
+    setDisplayMode(mode);
+    return output;
+  }
 
   if (mode === "custom") {
-    const imagePath = customImagePath;
+    const imagePath = config.customImagePath;
     if (!imagePath || !(await fileExists(imagePath))) {
       throw new Error("Custom image file not found");
     }
+
+    const output = await runAsterctlDirect(["--device", DEVICE, "--image", imagePath]);
+    setDisplayMode(mode);
+    return output;
   }
 
-  if (mode === "text") {
-    const imagePath = textBannerImagePath;
-    if (!imagePath || !(await fileExists(imagePath))) {
-      throw new Error("Text banner image file not found");
-    }
-  }
-
-  if (mode === "truenas" && !(await fileExists(TRUENAS_LOGO_PATH))) {
-    throw new Error("TrueNAS logo asset missing in container");
-  }
-
-  await appendLog("info", "display", `Applying display mode: ${mode}`);
-  return runAsterctlDirect(args);
-}
-
-export async function applyDisplayMode(
-  mode: DisplayMode,
-  customImagePath: string | null,
-  textBannerImagePath: string | null = null,
-): Promise<string> {
-  return enqueueDisplayTask(() =>
-    applyDisplayModeInner(mode, customImagePath, textBannerImagePath),
-  );
-}
-
-async function applyConfigInner(config: DisplayConfig): Promise<string> {
-  if (config.displayMode === "text") {
-    await stopTextBannerLive();
-    await appendLog("info", "display", "Generating text banner image");
-
-    const snapshot = await loadAllSensorValues();
-    const imagePath = await generateTextBannerImage(
-      config.textBanner,
-      snapshot,
-    );
-    await appendLog("info", "display", "Applying display mode: text");
+  if (isSceneMode(mode)) {
+    const snapshot = shouldShowCornerSensors(config.overlay)
+      ? await loadAllSensorValues()
+      : {};
+    const imagePath = await generateSceneImage(config, snapshot);
     await runAsterctlDirect(["--device", DEVICE, "--image", imagePath]);
-    await startTextBannerLive(config.textBanner);
-    return "Text banner applied";
+    await startSceneLive(config);
+    setDisplayMode(mode);
+    return "Scene applied";
   }
 
-  return applyDisplayModeInner(config.displayMode, config.customImagePath);
+  throw new Error(`Unsupported display mode: ${mode}`);
 }
 
 export async function applyConfig(config: DisplayConfig): Promise<string> {
   return enqueueDisplayTask(() => applyConfigInner(config));
 }
 
-async function quickCommandInner(
-  command: "on" | "off" | "sensors",
-): Promise<string> {
-  await appendLog("info", "display", `Quick action: ${command}`);
-
-  if (command === "sensors") {
-    await stopTextBannerLive();
-    return startPanelModeDirect();
-  }
-
-  await stopTextBannerLive();
-
-  if (command === "off") {
-    return runAsterctlDirect(["--device", DEVICE, "--off"]);
-  }
-
-  return runAsterctlDirect(["--device", DEVICE, "--image", TRUENAS_LOGO_PATH]);
+/** True when the cached scene on disk can be reused instead of re-rendering. */
+export async function hasCachedScene(): Promise<boolean> {
+  return fileExists(SCENE_PATH);
 }
 
 export async function quickCommand(
-  command: "on" | "off" | "sensors",
+  command: "off" | "sensors",
 ): Promise<string> {
-  return enqueueDisplayTask(() => quickCommandInner(command));
+  await appendLog("info", "display", `Quick action: ${command}`);
+
+  return enqueueDisplayTask(async () => {
+    await stopSceneLive();
+
+    if (command === "sensors") {
+      const output = await startPanelModeDirect();
+      setDisplayMode("sensors");
+      return output;
+    }
+
+    const output = await runAsterctlDirect(["--device", DEVICE, "--off"]);
+    setDisplayMode("off");
+    return output;
+  });
 }

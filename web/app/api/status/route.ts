@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
-import { isAuthEnabled } from "@/lib/auth";
+import { isAuthEnabled, verifyRequest } from "@/lib/auth";
+import { getDisplayState } from "@/lib/display-state";
 import { isPanelModeRunning } from "@/lib/display-panel";
-import { isTextBannerLiveRunning } from "@/lib/text-banner-live";
+import { isSceneLiveRunning } from "@/lib/scene-live";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const authRequired = isAuthEnabled();
+
+  if (authRequired && !verifyRequest(request)) {
+    return NextResponse.json({ authRequired });
+  }
+
   return NextResponse.json({
-    authRequired: isAuthEnabled(),
+    authRequired,
+    ...getDisplayState(),
     panelRunning: isPanelModeRunning(),
-    textBannerLive: isTextBannerLiveRunning(),
+    sceneLive: isSceneLiveRunning(),
   });
 }

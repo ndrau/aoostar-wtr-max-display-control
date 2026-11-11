@@ -17,6 +17,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
+      fontconfig \
       fonts-dejavu-core \
       smartmontools \
       sudo \
@@ -25,7 +26,7 @@ RUN apt-get update \
     && echo 'root ALL=(ALL) NOPASSWD: /usr/sbin/smartctl' > /etc/sudoers.d/smartctl \
     && chmod 440 /etc/sudoers.d/smartctl
 
-RUN mkdir -p /tmp/asterctl /app/cfg /app/assets /app/fonts /app/scripts /data/uploads \
+RUN mkdir -p /tmp/asterctl /app/cfg /app/fonts /app/scripts /data/uploads \
     && curl -fsSL "https://github.com/zehnm/aoostar-rs/releases/download/${ASTERCTL_VERSION}/asterctl-${ASTERCTL_VERSION}-Linux-x64.tar.gz" \
     | tar -xzf - -C /tmp/asterctl \
     && mv /tmp/asterctl/asterctl /usr/local/bin/asterctl \
@@ -35,10 +36,12 @@ RUN mkdir -p /tmp/asterctl /app/cfg /app/assets /app/fonts /app/scripts /data/up
     && cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf /app/fonts/HarmonyOS_Sans_SC_Bold.ttf \
     && rm -rf /tmp/asterctl
 
+COPY web/public/fonts/InstrumentSerif-Regular.ttf /usr/share/fonts/truetype/rau/InstrumentSerif-Regular.ttf
+RUN fc-cache -f
+
 COPY cfg/monitor.json /app/cfg/monitor.json
 COPY cfg/sensor-mapping/truenas-default.cfg /app/cfg/sensor-mapping/truenas-default.cfg
 
-COPY assets/truenas-scale.png /app/assets/truenas-scale.png
 COPY scripts/apply-boot.mjs /app/scripts/apply-boot.mjs
 COPY scripts/log-append.mjs /app/scripts/log-append.mjs
 COPY entrypoint.sh /entrypoint.sh
@@ -46,6 +49,7 @@ RUN chmod +x /entrypoint.sh
 
 COPY --from=web-builder /build/.next/standalone /app
 COPY --from=web-builder /build/.next/static /app/.next/static
+COPY --from=web-builder /build/public /app/public
 
 WORKDIR /app
 
@@ -54,7 +58,7 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV DATA_DIR=/data
 ENV DEVICE=/dev/ttyACM0
-ENV TRUENAS_LOGO_PATH=/app/assets/truenas-scale.png
+ENV LOGO_DIR=/app/public/logos
 ENV ASTERCTL_PATH=/usr/local/bin/asterctl
 ENV FONT_DIR=/app/fonts
 ENV SMARTCTL_ENABLED=true

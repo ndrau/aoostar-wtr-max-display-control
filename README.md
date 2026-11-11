@@ -6,9 +6,11 @@ Uses [`asterctl`](https://github.com/zehnm/aoostar-rs) under the hood. The displ
 
 ## Features
 
-- **Default startup:** TrueNAS SCALE splash screen on the case display
-- **Web UI (Next.js):** configure display mode, upload logos, quick on/off, daily timer
-- **Modes:** TrueNAS logo · Live system dashboard · Text banner · Custom upload · Off
+- **Default startup:** Rau Media logo (modern) on the case display
+- **Web UI (Next.js):** live preview rendered by the server, draft/apply workflow, daily timer
+- **Modes:** Logo · Text banner · Live system dashboard · Custom upload · Off
+- **Logo picker:** Rau Media (horizontal, stacked, camera only; letter R / RM / none; any background, size) or the TrueNAS image
+- **Overlay:** clock and live sensor values over the logo or text banner
 - **Secure container:** only the serial device is passed through — no `privileged` mode
 
 Published image:
@@ -26,7 +28,7 @@ ghcr.io/ndrau/aoostar-wtr-max-display-control:latest
 3. Deploy
 4. Open the web UI at `http://<truenas-ip>:3910`
 
-Default behaviour on container start: **show TrueNAS SCALE logo**.
+Default behaviour on container start: **show the Rau Media logo**.
 
 ### USB device path
 
@@ -44,9 +46,11 @@ Example from AOOSTAR WTR Max:
 
 | Section | What it does |
 |---|---|
-| Display mode | TrueNAS logo, live dashboard, text banner, custom upload, or off |
-| Quick actions | Instantly show logo, start dashboard, or turn display off |
-| Custom upload | Upload PNG/JPG (960×376 recommended) |
+| Preview | Server-rendered 960×376 image of the draft, identical to what the LCD shows |
+| Display mode | Logo, text banner, live dashboard, custom upload, or off |
+| Logo | Brand, layout, letter, background color and size |
+| Clock & live values | Optional overlay on logo and text banner |
+| Custom upload | Upload PNG/JPG/WEBP (960×376 recommended), drag and drop |
 | Timer | Daily on/off schedule |
 | Activity log | Live log of boot, asterctl commands, scheduler, uploads, and errors |
 | Live sensor data | Preview of values sent to the case display in dashboard mode |
@@ -86,38 +90,50 @@ the sensor mapping file. The default mapping ships CPU/RAM/GPU fields; extend
 `/app/cfg/sensor-mapping/truenas-default.cfg` or set `SENSOR_MAPPING` if your
 NIC or pool layout needs custom labels.
 
-## Text banner
+## Logo, text banner and overlay
 
-The **Text banner** mode renders your own text as a 960×376 PNG and sends it to
-the display. Pick text color and background color in the web UI, optionally assign
-live system metrics to each corner (top/bottom, left/right), preview the layout,
-then apply settings. Corner values refresh every 3 seconds when at least one
-corner sensor is selected.
+**Logo** and **Text banner** are rendered server-side (sharp) into a 960×376 PNG and
+sent to the display. The same renderer produces the web UI preview, so what you see
+is what the LCD shows. The last rendered image is stored at `/data/uploads/scene.png`
+and replayed on container start before the web UI is up.
 
-Corner options include **fans (RPM)**, **SSD/HDD usage and temperature**, motherboard
-temperature, network, CPU/RAM/GPU, and uptime. Fan speeds are read from host
-`/sys/class/hwmon` (requires the `/sys` mount). Disk usage bars use `aster-sysinfo
---disk-refresh` and appear on the system dashboard panel 2.
- The generated image is stored at
-`/data/uploads/text-banner.png`.
+The logo files live in `web/public/logos/rau-media/` as
+`<layout>-<light|dark>-<r|rm|none>.png`. The light or dark variant is chosen
+automatically from the background color.
 
-Example corner config in `config.json`:
+The **overlay** adds the current time (with seconds) at the top and up to four live
+values in the corners. It refreshes every 3 seconds. Corner options include fans
+(RPM), SSD/HDD usage and temperature, motherboard temperature, network, CPU/RAM/GPU,
+and uptime. Fan speeds are read from host `/sys/class/hwmon` (requires the `/sys` mount).
+
+Example scene settings in `config.json`:
 
 ```json
-"textBanner": {
-  "text": "AndyNAS",
-  "textColor": "#e8eef8",
-  "backgroundColor": "#0b1220",
-  "cornerColor": "#9aa8c2",
-  "corners": {
-    "topLeft": "cpu_usage_percent",
-    "topRight": "temperature_cpu",
-    "bottomLeft": "mem_usage_percent",
-    "bottomRight": "network_primary_address"
+{
+  "displayMode": "logo",
+  "logo": {
+    "brand": "rau-media",
+    "layout": "quer",
+    "badge": "r",
+    "backgroundColor": "#090b0a",
+    "scale": 80
+  },
+  "textBanner": { "text": "Rau Media", "font": "serif", "textColor": "#ede8df", "backgroundColor": "#090b0a" },
+  "overlay": {
+    "showClock": true,
+    "showCornerSensors": true,
+    "corners": {
+      "topLeft": "cpu_usage_percent",
+      "topRight": "temperature_cpu",
+      "bottomLeft": "mem_usage_percent",
+      "bottomRight": "network_primary_address"
+    }
   }
 }
 ```
 
+Configs from earlier versions (`displayMode: "truenas"`, clock and corners inside
+`textBanner`) are migrated automatically.
 
 Set `API_TOKEN` in the container environment before exposing the UI on your network.
 
@@ -161,7 +177,7 @@ services:
 | `PORT` | `3000` | Web UI port inside the container |
 | `API_TOKEN` | unset | Protects all `/api/*` routes when set |
 | `TZ` | UTC | Scheduler timezone, e.g. `Europe/Berlin` |
-| `TRUENAS_LOGO_PATH` | `/app/assets/truenas-scale.png` | Built-in splash image |
+| `LOGO_DIR` | `/app/public/logos` | Logo images used by the renderer |
 | `SENSOR_MAPPING` | `sensor-mapping/truenas-default.cfg` | Maps aster-sysinfo keys to AOOSTAR panel labels |
 | `CONFIG_DIR` | `/app/cfg` | asterctl configuration directory |
 

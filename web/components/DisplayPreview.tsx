@@ -1,140 +1,157 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatCornerLabel } from "@/lib/sensor-fields";
+import { apiFetch } from "@/lib/client-auth";
+import { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "@/lib/display-dimensions";
 import { getModeMeta } from "@/lib/mode-meta";
-import { formatBannerClock } from "@/lib/format";
-import { resolveBannerFontSize } from "@/lib/text-banner-font";
-import {
-  BANNER_CLOCK_FONT_SIZE,
-  BANNER_CORNER_FONT_SIZE,
-  DISPLAY_HEIGHT,
-  DISPLAY_WIDTH,
-} from "@/lib/display-dimensions";
+import { needsOverlayLiveRefresh } from "@/lib/sensor-fields";
 import type { DisplayConfig } from "@/lib/types";
+
+const DEBOUNCE_MS = 250;
+const LIVE_REFRESH_MS = 3_000;
+
+type Rendered = "logo" | "text" | "custom";
+
+function isRendered(mode: DisplayConfig["displayMode"]): mode is Rendered {
+  return mode === "logo" || mode === "text" || mode === "custom";
+}
+
+/** Draft preview rendered by the server, so it matches the LCD pixel for pixel. */
+function useRenderedPreview(config: DisplayConfig, version: number) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const mode = config.displayMode;
+  const live =
+    (mode === "logo" || mode === "text") &&
+    needsOverlayLiveRefresh(config.overlay);
+  const body = isRendered(mode)
+    ? JSON.stringify({
+        displayMode: mode,
+        customImagePath: config.customImagePath,
+        logo: config.logo,
+        textBanner: config.textBanner,
+        overlay: config.overlay,
+      })
+    : null;
+
+  useEffect(() => {
+    if (!body) return;
+
+    let cancelled = false;
+    let controller: AbortController | null = null;
+    let currentUrl: string | null = null;
+
+    async function load() {
+      controller?.abort();
+      controller = new AbortController();
+
+      try {
+        const response = await apiFetch("/api/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("preview failed");
+
+        const next = URL.createObjectURL(await response.blob());
+        if (cancelled) {
+          URL.revokeObjectURL(next);
+          return;
+        }
+
+        const previous = currentUrl;
+        currentUrl = next;
+        setUrl(next);
+        setFailed(false);
+        if (previous) URL.revokeObjectURL(previous);
+      } catch {
+        if (!cancelled && !controller?.signal.aborted) setFailed(true);
+      }
+    }
+
+    const timeout = window.setTimeout(load, DEBOUNCE_MS);
+    const interval = live ? window.setInterval(load, LIVE_REFRESH_MS) : null;
+
+    return () => {
+      cancelled = true;
+      controller?.abort();
+      window.clearTimeout(timeout);
+      if (interval) window.clearInterval(interval);
+    };
+  }, [body, live, version]);
+
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+    // Only the last URL needs cleanup on unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { url, failed };
+}
 
 export function DisplayPreview({
   config,
-  sensorValues,
+  dirty,
   panelRunning,
+  version,
 }: {
   config: DisplayConfig;
-  sensorValues: Record<string, string>;
+  dirty: boolean;
   panelRunning: boolean;
+  /** Bumped after uploads so a replaced image is fetched again. */
+  version: number;
 }) {
   const mode = getModeMeta(config.displayMode);
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    if (config.displayMode !== "text" || !config.textBanner.showClock) {
-      return;
-    }
-
-    const interval = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(interval);
-  }, [config.displayMode, config.textBanner.showClock]);
-
-  if (config.displayMode === "text") {
-    const corners = [
-      ["corner-top-left", "topLeft"],
-      ["corner-top-right", "topRight"],
-      ["corner-bottom-left", "bottomLeft"],
-      ["corner-bottom-right", "bottomRight"],
-    ] as const;
-
-    const bannerFontSize = resolveBannerFontSize(config.textBanner);
-
-    return (
-      <div className="preview-shell">
-        <div className="preview-meta">
-          <span className="preview-label">Vorschau · 960×376</span>
-          <span className="pill pill-muted">{mode.title}</span>
-        </div>
-        <div
-          className="display-frame text-banner-preview"
-          style={{
-            backgroundColor: config.textBanner.backgroundColor,
-            color: config.textBanner.textColor,
-            ["--banner-w" as string]: DISPLAY_WIDTH,
-            ["--banner-h" as string]: DISPLAY_HEIGHT,
-            ["--corner-font" as string]: BANNER_CORNER_FONT_SIZE,
-            ["--clock-font" as string]: BANNER_CLOCK_FONT_SIZE,
-          }}
-        >
-          {config.textBanner.showClock ? (
-            <span
-              className="text-banner-clock"
-              style={{ color: config.textBanner.cornerColor }}
-            >
-              {formatBannerClock(now)}
-            </span>
-          ) : null}
-          {config.textBanner.showCornerSensors
-            ? corners.map(([className, corner]) => {
-                const label = formatCornerLabel(
-                  config.textBanner.corners[corner],
-                  sensorValues,
-                );
-                if (!label) return null;
-
-                return (
-                  <span
-                    key={corner}
-                    className={`text-banner-corner ${className}`}
-                    style={{ color: config.textBanner.cornerColor }}
-                  >
-                    {label}
-                  </span>
-                );
-              })
-            : null}
-          <span
-            className="text-banner-center"
-            style={{
-              fontSize: `calc(${bannerFontSize} / var(--banner-w) * 100cqw)`,
-            }}
-          >
-            {config.textBanner.text.trim() || "Vorschau"}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  const previewContent: Record<DisplayConfig["displayMode"], string> = {
-    truenas: "TrueNAS SCALE",
-    sensors: panelRunning ? "Live Dashboard aktiv" : "System-Dashboard",
-    custom: "Eigenes Bild",
-    off: "Display aus",
-    text: "",
-  };
-
-  const previewClass =
-    config.displayMode === "truenas"
-      ? "preview-truenas"
-      : config.displayMode === "sensors"
-        ? "preview-sensors"
-        : config.displayMode === "custom"
-          ? "preview-custom"
-          : config.displayMode === "off"
-            ? "preview-off"
-            : "preview-default";
+  const { url, failed } = useRenderedPreview(config, version);
+  const rendered = isRendered(config.displayMode);
 
   return (
     <div className="preview-shell">
       <div className="preview-meta">
-        <span className="preview-label">Anzeige</span>
-        <span className={`pill ${panelRunning ? "pill-accent" : "pill-muted"}`}>
-          {mode.title}
+        <span className="preview-label">
+          {DISPLAY_WIDTH}×{DISPLAY_HEIGHT} · {mode.title}
+        </span>
+        <span className={`pill ${dirty ? "pill-warn" : "pill-accent"}`}>
+          {dirty ? "Entwurf" : "Auf dem Display"}
         </span>
       </div>
-      <div className={`display-frame display-frame-mock ${previewClass}`}>
-        <span className="display-frame-title">{previewContent[config.displayMode]}</span>
-        {config.displayMode === "sensors" ? (
-          <span className="display-frame-sub">
-            {panelRunning ? "Sensoren werden live aktualisiert" : "Nach Übernehmen starten"}
-          </span>
-        ) : null}
+
+      <div className="display-bezel">
+        <div
+          className={`display-frame ${
+            config.displayMode === "off" ? "is-off" : ""
+          }`}
+        >
+          {rendered && url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="Vorschau des Displays" draggable={false} />
+          ) : null}
+
+          {rendered && !url ? (
+            <span className="display-frame-note">
+              {failed ? "Vorschau nicht verfügbar" : "Vorschau wird erstellt…"}
+            </span>
+          ) : null}
+
+          {config.displayMode === "sensors" ? (
+            <div className="display-frame-note">
+              <strong>System-Dashboard</strong>
+              <span>
+                {panelRunning
+                  ? "Läuft live auf dem Display"
+                  : "Startet nach dem Übernehmen"}
+              </span>
+            </div>
+          ) : null}
+
+          {config.displayMode === "off" ? (
+            <span className="display-frame-note">Display aus</span>
+          ) : null}
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 import { applyConfig } from "./display";
 import { appendLog } from "./logger";
 import { readConfig } from "./config";
-import { stopTextBannerLive } from "./text-banner-live";
 import {
   isWithinDisplayWindow,
   resolveScheduledDisplayConfig,
@@ -12,14 +11,12 @@ let lastAppliedState: "on-window" | "off-window" | null = null;
 
 async function applyScheduledState(config: DisplayConfig): Promise<void> {
   const activeConfig = resolveScheduledDisplayConfig(config);
-  await stopTextBannerLive();
   await applyConfig(activeConfig);
 }
 
 export async function applyConfigForSave(config: DisplayConfig): Promise<void> {
   if (!config.schedule.enabled) {
     lastAppliedState = null;
-    await stopTextBannerLive();
     await applyConfig(config);
     return;
   }
@@ -41,7 +38,6 @@ export async function runScheduledCheck(): Promise<void> {
         config.displayMode,
       );
       lastAppliedState = null;
-      await stopTextBannerLive();
       await applyConfig(config);
     } else {
       lastAppliedState = null;

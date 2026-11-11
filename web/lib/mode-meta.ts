@@ -4,41 +4,33 @@ export interface ModeMeta {
   value: DisplayMode;
   title: string;
   subtitle: string;
-  icon: string;
-  recommended?: boolean;
 }
 
 export const MODE_META: ModeMeta[] = [
   {
-    value: "truenas",
-    title: "TrueNAS Logo",
-    subtitle: "Standard — startet automatisch mit dem Container.",
-    icon: "◆",
-    recommended: true,
+    value: "logo",
+    title: "Logo",
+    subtitle: "Rau Media oder TrueNAS, wahlweise mit Uhr und Live-Daten.",
+  },
+  {
+    value: "text",
+    title: "Schriftzug",
+    subtitle: "Eigener Text in beliebigen Farben.",
   },
   {
     value: "sensors",
     title: "System-Dashboard",
-    subtitle: "Offizielles Live-Panel mit CPU, RAM, Netzwerk & Disks.",
-    icon: "▣",
-  },
-  {
-    value: "text",
-    title: "Text-Banner",
-    subtitle: "Eigener Schriftzug mit optionalen Live-Daten in den Ecken.",
-    icon: "Aa",
+    subtitle: "Live-Panel mit CPU, RAM, Netzwerk und Disks.",
   },
   {
     value: "custom",
     title: "Eigenes Bild",
-    subtitle: "PNG oder JPG hochladen (960×376 empfohlen).",
-    icon: "▤",
+    subtitle: "PNG, JPG oder WEBP hochladen.",
   },
   {
     value: "off",
-    title: "Display aus",
-    subtitle: "LCD komplett abschalten.",
-    icon: "○",
+    title: "Aus",
+    subtitle: "Display dauerhaft abschalten.",
   },
 ];
 
