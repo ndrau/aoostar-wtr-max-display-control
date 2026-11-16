@@ -1,4 +1,17 @@
-export type BannerCorner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
+import { formatBitRate, formatBytes } from "./format";
+
+/** Overlay slots: five along the top edge, five along the bottom edge. */
+export type BannerCorner =
+  | "topLeft"
+  | "topLeftInner"
+  | "topCenter"
+  | "topRightInner"
+  | "topRight"
+  | "bottomLeft"
+  | "bottomLeftInner"
+  | "bottomCenter"
+  | "bottomRightInner"
+  | "bottomRight";
 
 export type SensorFieldId =
   | "none"
@@ -22,14 +35,10 @@ export type SensorFieldId =
   | "storage_hdd_0_used"
   | "storage_hdd_0_temperature"
   | "storage_hdd_1_used"
-  | "storage_hdd_1_temperature";
+  | "storage_hdd_1_temperature"
+  | "storage_pool_free";
 
-export interface TextBannerCorners {
-  topLeft: SensorFieldId;
-  topRight: SensorFieldId;
-  bottomLeft: SensorFieldId;
-  bottomRight: SensorFieldId;
-}
+export type TextBannerCorners = Record<BannerCorner, SensorFieldId>;
 
 export interface SensorFieldOption {
   id: SensorFieldId;
@@ -57,7 +66,7 @@ export const SENSOR_FIELD_GROUPS: SensorFieldGroup[] = [
         label: "Mainboard-Temperatur",
         shortLabel: "Board",
       },
-      { id: "system_uptime", label: "Laufzeit", shortLabel: "Up" },
+      { id: "system_uptime", label: "Laufzeit", shortLabel: "Uptime" },
       { id: "load_average_1m", label: "Last (1 Min.)", shortLabel: "Load" },
     ],
   },
@@ -67,12 +76,12 @@ export const SENSOR_FIELD_GROUPS: SensorFieldGroup[] = [
       {
         id: "network_primary_upload_speed",
         label: "Upload",
-        shortLabel: "Up",
+        shortLabel: "↑",
       },
       {
         id: "network_primary_download_speed",
         label: "Download",
-        shortLabel: "Down",
+        shortLabel: "↓",
       },
       {
         id: "network_primary_address",
@@ -95,6 +104,7 @@ export const SENSOR_FIELD_GROUPS: SensorFieldGroup[] = [
   {
     label: "SSD / NVMe",
     options: [
+      { id: "storage_pool_free", label: "Pool frei (/data)", shortLabel: "Frei" },
       { id: "storage_ssd_0_used", label: "SSD 1 belegt", shortLabel: "SSD1" },
       {
         id: "storage_ssd_0_temperature",
@@ -194,14 +204,30 @@ function parseStorageFieldId(
   };
 }
 
+/** aster-sysinfo fallback: the interface that has moved the most data. */
 function findNetworkKey(
   values: Record<string, string>,
   suffix: "upload_speed" | "download_speed" | "address0",
 ): string | undefined {
-  const match = Object.keys(values)
-    .filter((key) => key.startsWith("network_") && key.endsWith(`_${suffix}`))
-    .sort()[0];
-  return match ? values[match] : undefined;
+  const busiest = Object.keys(values)
+    .filter((key) => /^network_.+_total_received_bytes$/.test(key))
+    .sort(
+      (left, right) =>
+        Number.parseFloat(values[right]) - Number.parseFloat(values[left]),
+    )[0];
+  const prefix = busiest?.replace(/_total_received_bytes$/, "");
+  return prefix ? values[`${prefix}_${suffix}`] : undefined;
+}
+
+function formatUptime(value: string): string {
+  const seconds = Number.parseFloat(value);
+  if (Number.isNaN(seconds)) {
+    return value;
+  }
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  return days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`;
 }
 
 export function isSensorFieldId(value: unknown): value is SensorFieldId {
@@ -217,15 +243,29 @@ export function resolveSensorValue(
   }
 
   if (fieldId === "network_primary_upload_speed") {
-    return findNetworkKey(values, "upload_speed");
+    return (
+      values.host_network_upload_bytes_per_sec ??
+      findNetworkKey(values, "upload_speed")
+    );
   }
 
   if (fieldId === "network_primary_download_speed") {
-    return findNetworkKey(values, "download_speed");
+    return (
+      values.host_network_download_bytes_per_sec ??
+      findNetworkKey(values, "download_speed")
+    );
   }
 
   if (fieldId === "network_primary_address") {
-    return findNetworkKey(values, "address0");
+    return values.host_network_address ?? findNetworkKey(values, "address0");
+  }
+
+  if (fieldId === "system_uptime") {
+    return values.system_uptime_seconds ?? values.system_uptime;
+  }
+
+  if (fieldId === "storage_pool_free") {
+    return values.storage_pool_free_bytes;
   }
 
   if (fieldId === "load_average_1m") {
@@ -234,6 +274,12 @@ export function resolveSensorValue(
 
   const storageField = parseStorageFieldId(fieldId);
   if (storageField) {
+    // aster-sysinfo reports 0 for disks it cannot see (e.g. ZFS members).
+    const sizeKey = `storage_${storageField.kind}[${storageField.index}]_total_size_bytes`;
+    if (storageField.metric === "used" && values[sizeKey] === "0") {
+      return undefined;
+    }
+
     return findFirstValue(
       values,
       storageSysinfoCandidates(
@@ -304,8 +350,18 @@ export function formatSensorFieldValue(
     case "fan_primary_rpm":
     case "fan_secondary_rpm":
       return formatRpm(rawValue);
+    case "system_uptime":
+      return formatUptime(rawValue);
+    case "storage_pool_free": {
+      const bytes = Number.parseFloat(rawValue);
+      return Number.isNaN(bytes) ? rawValue : formatBytes(bytes);
+    }
     case "network_primary_upload_speed":
     case "network_primary_download_speed": {
+      // Host counters arrive as plain bytes per second.
+      if (/^[\d.]+$/.test(rawValue)) {
+        return formatBitRate(Number.parseFloat(rawValue));
+      }
       const speedKey = Object.keys(values)
         .filter((key) =>
           fieldId === "network_primary_upload_speed"
@@ -350,10 +406,10 @@ export function formatCornerLabel(
     return `Board ${formatted}`;
   }
   if (fieldId === "network_primary_upload_speed") {
-    return `Up ${formatted}`;
+    return `↑ ${formatted}`;
   }
   if (fieldId === "network_primary_download_speed") {
-    return `Down ${formatted}`;
+    return `↓ ${formatted}`;
   }
   if (fieldId === "network_primary_address") {
     return formatted;
@@ -395,17 +451,31 @@ export function needsOverlayLiveRefresh(settings: {
 
 export const DEFAULT_TEXT_BANNER_CORNERS: TextBannerCorners = {
   topLeft: "none",
+  topLeftInner: "none",
+  topCenter: "none",
+  topRightInner: "none",
   topRight: "none",
   bottomLeft: "none",
+  bottomLeftInner: "none",
+  bottomCenter: "none",
+  bottomRightInner: "none",
   bottomRight: "none",
 };
 
 export const BANNER_CORNER_LABELS: Record<BannerCorner, string> = {
   topLeft: "Oben links",
+  topLeftInner: "Oben halblinks",
+  topCenter: "Oben Mitte",
+  topRightInner: "Oben halbrechts",
   topRight: "Oben rechts",
   bottomLeft: "Unten links",
+  bottomLeftInner: "Unten halblinks",
+  bottomCenter: "Unten Mitte",
+  bottomRightInner: "Unten halbrechts",
   bottomRight: "Unten rechts",
 };
+
+export const BANNER_CORNERS = Object.keys(BANNER_CORNER_LABELS) as BannerCorner[];
 
 export function getStoragePanelKeys(values: Record<string, string>): string[] {
   return Object.keys(values).filter((key) =>

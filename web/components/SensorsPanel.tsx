@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-auth";
 import { formatTime } from "@/lib/format";
+import {
+  SENSOR_FIELD_OPTIONS,
+  formatSensorFieldValue,
+  resolveSensorValue,
+} from "@/lib/sensor-fields";
 
 export function SensorsPanel({ refreshToken }: { refreshToken: number }) {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -30,38 +35,13 @@ export function SensorsPanel({ refreshToken }: { refreshToken: number }) {
     return () => window.clearInterval(interval);
   }, [fetchSensors, refreshToken]);
 
-  const highlights = [
-    ["cpu_usage_percent", "CPU"],
-    ["temperature_cpu", "CPU Temp"],
-    ["mem_usage_percent", "RAM"],
-    ["fan_primary_rpm", "Lüfter 1"],
-    ["storage_ssd_0_used", "SSD 1"],
-    ["storage_ssd_0_temperature", "SSD 1 Temp"],
-    ["storage_hdd_0_used", "HDD 1"],
-    ["storage_hdd_0_temperature", "HDD 1 Temp"],
-  ] as const;
-
-  function resolveValue(key: string): string {
-    return (
-      values[key] ??
-      (key === "cpu_usage_percent" ? values.cpu_percent : undefined) ??
-      (key === "storage_ssd_0_used"
-        ? values["storage_ssd[0]['used']"]
-        : undefined) ??
-      (key === "storage_hdd_0_used"
-        ? values["storage_hdd[0]['used']"]
-        : undefined) ??
-      (key === "storage_ssd_0_temperature"
-        ? values["storage_ssd[0]['temperature']"] ??
-          values["storage_ssd[0]_temperature"]
-        : undefined) ??
-      (key === "storage_hdd_0_temperature"
-        ? values["storage_hdd[0]['temperature']"] ??
-          values["storage_hdd[0]_temperature"]
-        : undefined) ??
-      "—"
-    );
-  }
+  // Only fields the host actually reports; e.g. no fan tile without a fan driver.
+  const tiles = SENSOR_FIELD_OPTIONS.filter((option) => option.id !== "none")
+    .map((option) => ({
+      option,
+      raw: resolveSensorValue(option.id, values),
+    }))
+    .filter(({ raw }) => raw !== undefined && raw.trim() !== "");
 
   return (
     <div className="stack">
@@ -85,10 +65,10 @@ export function SensorsPanel({ refreshToken }: { refreshToken: number }) {
 
       {Object.keys(values).length > 0 ? (
         <div className="sensor-grid">
-          {highlights.map(([key, label]) => (
-            <div className="sensor-tile" key={key}>
-              <span className="sensor-label">{label}</span>
-              <strong>{resolveValue(key)}</strong>
+          {tiles.map(({ option, raw }) => (
+            <div className="sensor-tile" key={option.id}>
+              <span className="sensor-label">{option.label}</span>
+              <strong>{formatSensorFieldValue(option.id, raw, values)}</strong>
             </div>
           ))}
         </div>

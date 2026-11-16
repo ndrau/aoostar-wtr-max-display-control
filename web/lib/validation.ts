@@ -24,8 +24,8 @@ import {
   TEXT_BANNER_FONT_MIN,
 } from "./text-banner-font";
 import {
+  BANNER_CORNERS,
   isSensorFieldId,
-  type BannerCorner,
   type TextBannerCorners,
 } from "./sensor-fields";
 import { UPLOAD_DIR } from "./paths";
@@ -35,12 +35,6 @@ const LOGO_BRANDS: LogoBrand[] = ["rau-media", "truenas"];
 const LOGO_LAYOUTS: LogoLayout[] = ["quer", "stacked", "camera"];
 const LOGO_BADGES: LogoBadge[] = ["r", "rm", "none"];
 const TEXT_FONTS: TextBannerFont[] = ["serif", "sans"];
-const CORNERS: BannerCorner[] = [
-  "topLeft",
-  "topRight",
-  "bottomLeft",
-  "bottomRight",
-];
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -100,7 +94,7 @@ function clampNumber(
 function normalizeCorners(input: Loose): TextBannerCorners {
   const result = { ...DEFAULT_OVERLAY.corners };
 
-  for (const corner of CORNERS) {
+  for (const corner of BANNER_CORNERS) {
     const value = input?.[corner];
     if (isSensorFieldId(value)) {
       result[corner] = value;

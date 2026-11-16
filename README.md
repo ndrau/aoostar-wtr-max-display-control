@@ -112,10 +112,14 @@ The logo files live in `web/public/logos/rau-media/` as
 `<layout>-<light|dark>-<r|rm|none>.png`. The light or dark variant is chosen
 automatically from the background color.
 
-The **overlay** adds the current time (with seconds) at the top and up to four live
-values in the corners. It refreshes every 3 seconds. Corner options include fans
-(RPM), SSD/HDD usage and temperature, motherboard temperature, network, CPU/RAM/GPU,
-and uptime. Fan speeds are read from host `/sys/class/hwmon` (requires the `/sys` mount).
+The **overlay** adds the current time (with seconds) at the top and up to ten live
+values: five slots along the top edge (left, half-left, centre, half-right, right) and
+five along the bottom. The top centre belongs to the clock while it is on. It refreshes
+every 3 seconds. Options include CPU/RAM/GPU, NVMe temperatures, free space of the
+pool behind `/data`, upload/download and IP of the host's default interface, load,
+uptime, and fans (RPM, only if the host has a fan driver loaded; TrueNAS on the
+WTR Max has none). Network values come from host `/sys/class/net`, fan speeds from
+host `/sys/class/hwmon` (both require the `/sys` mount).
 
 Example scene settings in `config.json`:
 
@@ -138,6 +142,8 @@ Example scene settings in `config.json`:
       "topRight": "temperature_cpu",
       "bottomLeft": "mem_usage_percent",
       "bottomRight": "network_primary_address"
+      // also: topLeftInner, topCenter, topRightInner,
+      //       bottomLeftInner, bottomCenter, bottomRightInner
     }
   }
 }

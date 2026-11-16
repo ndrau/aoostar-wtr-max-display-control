@@ -1,7 +1,8 @@
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, statfs } from "fs/promises";
 import path from "path";
+import { readNetworkSnapshot } from "./network";
 import { parseSensorFile } from "./sensors";
-import { SENSOR_DIR } from "./paths";
+import { DATA_DIR, SENSOR_DIR } from "./paths";
 
 const SYSINFO_FILE = path.join(SENSOR_DIR, "sysinfo.txt");
 const HWMON_ROOT = "/sys/class/hwmon";
@@ -48,9 +49,10 @@ async function readNvmeDiskTemperatures(): Promise<Record<string, string>> {
       .sort();
 
     for (const [index, entry] of entries.entries()) {
-      const temp = await readFirstHwmonTemp(
-        path.join(NVME_ROOT, entry, "device", "hwmon"),
-      );
+      // Newer kernels register the hwmon directly below the controller.
+      const temp =
+        (await readFirstHwmonTemp(path.join(NVME_ROOT, entry, "device", "hwmon"))) ??
+        (await readFirstHwmonTemp(path.join(NVME_ROOT, entry)));
 
       if (temp !== undefined) {
         values[`storage_ssd[${index}]_temperature`] = `${temp.toFixed(1)} °C`;
@@ -161,6 +163,53 @@ export async function readHwmonSensors(): Promise<Record<string, string>> {
   return values;
 }
 
+async function readHostNetwork(): Promise<Record<string, string>> {
+  const values: Record<string, string> = {};
+
+  try {
+    const snapshot = await readNetworkSnapshot();
+    const primary = snapshot.interfaces[0];
+    if (!primary) return values;
+
+    values.host_network_interface = primary.name;
+    if (primary.rxBytesPerSec !== null) {
+      values.host_network_download_bytes_per_sec = String(primary.rxBytesPerSec);
+    }
+    if (primary.txBytesPerSec !== null) {
+      values.host_network_upload_bytes_per_sec = String(primary.txBytesPerSec);
+    }
+    if (primary.ipv4[0]) {
+      values.host_network_address = primary.ipv4[0];
+    }
+  } catch {
+    return values;
+  }
+
+  return values;
+}
+
+async function readUptime(): Promise<Record<string, string>> {
+  try {
+    // /proc/uptime is not namespaced, so this is the host's uptime.
+    const raw = await readFile("/proc/uptime", "utf8");
+    const seconds = Number.parseFloat(raw.split(" ")[0]);
+    return Number.isNaN(seconds) ? {} : { system_uptime_seconds: String(seconds) };
+  } catch {
+    return {};
+  }
+}
+
+async function readDataPoolFree(): Promise<Record<string, string>> {
+  try {
+    // Free space of the dataset behind /data equals the pool's free space
+    // unless the dataset has a quota.
+    const stats = await statfs(DATA_DIR);
+    return { storage_pool_free_bytes: String(stats.bavail * stats.bsize) };
+  } catch {
+    return {};
+  }
+}
+
 function deriveCpuUsagePercent(values: Record<string, string>): string | undefined {
   const usages = Object.entries(values)
     .filter(([key]) => /^cpu_.+_usage$/.test(key))
@@ -188,11 +237,19 @@ export async function loadAllSensorValues(): Promise<Record<string, string>> {
   const hwmonValues = await readHwmonSensors();
   const nvmeTemps = await readNvmeDiskTemperatures();
   const hddTemps = await readRotationalDiskTemperatures();
+  const [networkValues, uptimeValues, poolValues] = await Promise.all([
+    readHostNetwork(),
+    readUptime(),
+    readDataPoolFree(),
+  ]);
   const merged: Record<string, string> = {
     ...sysinfoValues,
     ...hwmonValues,
     ...nvmeTemps,
     ...hddTemps,
+    ...networkValues,
+    ...uptimeValues,
+    ...poolValues,
   };
 
   for (const [key, value] of Object.entries({ ...nvmeTemps, ...hddTemps })) {
