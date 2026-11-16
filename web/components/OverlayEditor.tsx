@@ -1,10 +1,12 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { apiFetch } from "@/lib/client-auth";
 import {
   BANNER_CORNERS,
   BANNER_CORNER_LABELS,
   SENSOR_FIELD_GROUPS,
+  resolveSensorValue,
   type BannerCorner,
   type SensorFieldId,
 } from "@/lib/sensor-fields";
@@ -18,8 +20,31 @@ export function OverlayEditor({
   overlay: OverlaySettings;
   onChange: (next: OverlaySettings) => void;
 }) {
+  const [values, setValues] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    apiFetch("/api/sensors")
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.ok) setValues(data.values ?? {});
+      })
+      .catch(() => {
+        // Without sensor data every option stays selectable.
+      });
+  }, []);
+
   function updateCorner(corner: BannerCorner, value: SensorFieldId) {
     onChange({ ...overlay, corners: { ...overlay.corners, [corner]: value } });
+  }
+
+  // Offer only fields the host reports. Until data arrives (or if the collector
+  // has never run) all fields stay selectable.
+  function isAvailable(fieldId: SensorFieldId): boolean {
+    if (fieldId === "none" || !values || Object.keys(values).length === 0) {
+      return true;
+    }
+    const raw = resolveSensorValue(fieldId, values);
+    return raw !== undefined && raw.trim() !== "";
   }
 
   return (
@@ -60,15 +85,27 @@ export function OverlayEditor({
                     updateCorner(corner, event.target.value as SensorFieldId)
                   }
                 >
-                  {SENSOR_FIELD_GROUPS.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.options.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
+                  {SENSOR_FIELD_GROUPS.map((group) => {
+                    // Keep the current choice visible even without data.
+                    const options = group.options.filter(
+                      (option) =>
+                        isAvailable(option.id) ||
+                        option.id === overlay.corners[corner],
+                    );
+                    if (options.length === 0) return null;
+
+                    return (
+                      <optgroup key={group.label} label={group.label}>
+                        {options.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {isAvailable(option.id)
+                              ? option.label
+                              : `${option.label} (keine Daten)`}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
               </div>
             </Fragment>
