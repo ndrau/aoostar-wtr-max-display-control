@@ -142,12 +142,13 @@ Example scene settings in `config.json`:
       "topRight": "temperature_cpu",
       "bottomLeft": "mem_usage_percent",
       "bottomRight": "network_primary_address"
-      // also: topLeftInner, topCenter, topRightInner,
-      //       bottomLeftInner, bottomCenter, bottomRightInner
     }
   }
 }
 ```
+
+Further slot keys: `topLeftInner`, `topCenter`, `topRightInner`, `bottomLeftInner`,
+`bottomCenter`, `bottomRightInner`.
 
 Configs from earlier versions (`displayMode: "truenas"`, clock and corners inside
 `textBanner`) are migrated automatically.
