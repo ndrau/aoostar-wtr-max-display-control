@@ -8,6 +8,7 @@ import { DisplayPreview } from "@/components/DisplayPreview";
 import { LogoPicker } from "@/components/LogoPicker";
 import { LogsPanel } from "@/components/LogsPanel";
 import { ModePicker } from "@/components/ModePicker";
+import { NetworkPanel } from "@/components/NetworkPanel";
 import { OverlayEditor } from "@/components/OverlayEditor";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { SensorsPanel } from "@/components/SensorsPanel";
@@ -345,6 +346,14 @@ export default function Dashboard() {
             badge={live.panelRunning ? "Läuft" : "Gestoppt"}
           >
             <SensorsPanel refreshToken={refreshToken} />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Netzwerk"
+            description="Upload, Download und Verbindung des Servers"
+            badge="Live"
+          >
+            <NetworkPanel />
           </CollapsibleSection>
 
           <CollapsibleSection

@@ -54,6 +54,7 @@ Example from AOOSTAR WTR Max:
 | Timer | Daily on/off schedule |
 | Activity log | Live log of boot, asterctl commands, scheduler, uploads, and errors |
 | Live sensor data | Preview of values sent to the case display in dashboard mode |
+| Network | Live upload/download per interface with a 2-minute chart, link speed, IPv4, gateway, MAC, MTU, totals and errors |
 
 Settings are stored in the mounted volume at `/data/config.json`. Logs are stored at `/data/logs/display.log`.
 
@@ -89,6 +90,16 @@ Network speed, IP, and per-disk temperatures need interface-specific entries in
 the sensor mapping file. The default mapping ships CPU/RAM/GPU fields; extend
 `/app/cfg/sensor-mapping/truenas-default.cfg` or set `SENSOR_MAPPING` if your
 NIC or pool layout needs custom labels.
+
+## Network panel
+
+The **Network** section in the web UI reads the host's interface counters from
+`/sys/class/net` (via the `/sys:/sys:ro` mount) and computes upload and download
+rates from them. IPv4 addresses and the default gateway come from `/proc/1/net`,
+which is the host's network namespace when the container runs with `pid: host`.
+Physical NICs and bridges/bonds that carry the host address are listed; `lo`,
+`veth*`, `docker*` and similar virtual interfaces are skipped. It works in every
+display mode and does not need `aster-sysinfo`.
 
 ## Logo, text banner and overlay
 

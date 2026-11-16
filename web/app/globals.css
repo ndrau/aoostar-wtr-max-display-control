@@ -1018,3 +1018,66 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 }
+
+.net-chart {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: var(--panel-soft);
+}
+
+.net-sparkline {
+  width: 100%;
+  height: 64px;
+}
+
+.net-sparkline path {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+.net-line-down {
+  stroke: var(--accent-strong);
+}
+
+.net-line-up {
+  stroke: var(--warn);
+}
+
+.net-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+}
+
+.net-swatch-down {
+  background: var(--accent-strong);
+}
+
+.net-swatch-up {
+  background: var(--warn);
+}
+
+.net-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.net-details dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.net-details dd {
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
